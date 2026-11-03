@@ -1,0 +1,95 @@
+version: 4.1.0
+aggregation_policy:
+  metric_default: all
+  rubric_default: all
+  hybrid_atomic: all
+  budget: all
+  overall_score: none
+  decision: 任一已知违反判否；全部适用条件可验证且满足判是；其余保留未知
+  statistics: 当前公共输出仅含 metric 的 status/verdict，不输出诊断统计。
+  hard_constraints: hard/required_for_success 为保留标记；当前所有适用检查均采用 all，不产生额外权重或总分。
+metrics:
+- id: AC
+  name: Answer Correctness
+  name_zh: 答案正确性
+  layer: 1
+  aggregation: all
+  rubrics:
+  - AC-1
+  - AC-2
+  - AC-3
+  description: 最终答案的事实、可观察逻辑及计算正确性。
+- id: TC
+  name: Task Completion
+  name_zh: 任务完成度
+  layer: 1
+  aggregation: all
+  rubrics:
+  - TC-1
+  description: 目标和交付要求实际落实程度；按本任务全部适用检查合取，当前不另计算总体任务成功。
+- id: TU
+  name: Tool Use Correctness
+  name_zh: 工具调用正确性
+  layer: 1
+  aggregation: all
+  rubrics:
+  - TU-1
+  - TU-2
+  - TU-3
+  description: 工具能力匹配、调用与参数有效性、返回结果解读。
+- id: PE
+  name: Planning & Execution
+  name_zh: 规划与执行
+  layer: 1
+  aggregation: all
+  rubrics:
+  - PE-1
+  - PE-2
+  - PE-3
+  description: 可观察计划、非审批依赖顺序及跨步骤状态更新。
+- id: EG
+  name: Step-Level Evidence Grounding
+  name_zh: 步骤级证据支撑
+  layer: 1
+  aggregation: all
+  rubrics:
+  - EG-1
+  - EG-2
+  description: EG-1联合检查事前证据可用、可定位且支持行动；EG-2检查来源、版本和时效。
+- id: ER
+  name: Error Handling & Execution Robustness
+  name_zh: 错误处理与执行稳健性
+  layer: 1
+  aggregation: all
+  rubrics:
+  - ER-1
+  - ER-2
+  - ER-3
+  description: 异常识别、允许的恢复策略与恢复状态完整性。
+- id: EE
+  name: Execution Efficiency
+  name_zh: 执行效率
+  layer: 1
+  aggregation: all
+  rubrics:
+  - EE-4
+  description: 仅检查是否存在可证实的冗余操作；调用次数、Token和耗时不再与参考执行比较，绝对资源上限由BC检查。
+- id: HC
+  name: Human-in-the-Loop Compliance
+  name_zh: 人工审核合规性
+  layer: 2
+  aggregation: all
+  rubrics:
+  - HC-1
+  - HC-2
+  - HC-3
+  - HC-4
+  description: 所有适用审批条件是否满足；召回率和精确率仅保留为诊断统计。
+- id: BC
+  name: Resource & Budget Compliance
+  name_zh: 资源与预算合规性
+  layer: 2
+  aggregation: all
+  rubrics:
+  - BC-1
+  description: 配置的调用、耗时、Token、重试预算必须全部通过；不可均分补偿。

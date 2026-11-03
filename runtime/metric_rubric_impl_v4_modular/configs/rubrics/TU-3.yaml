@@ -1,0 +1,40 @@
+id: TU-3
+metric_id: TU
+name: Result Interpretation
+name_zh: 工具结果解读正确性
+definition: Agent是否正确解释了当前工具返回的指定内容？
+boundary: 工具输出到 Agent 解释的忠实转换；解释后的行动合理性归 EG-1。
+inputs:
+- 原始工具返回
+- Agent 的可观察解释
+- 必要字段语义
+default_method: J
+allowed_methods:
+- P
+- J
+- H
+instantiate_prompt: |-
+  按工具返回中的独立字段或结论拆分，绑定原始返回、字段语义与 Agent 的可观察解释。自然语言解释默认 J，核对状态、单位、错误码和必要限定，不以字面相等或关键词出现代替忠实解读；输出字段与原始字段存在明确可信映射时可 P。H 仅用于同一命题的必要机械条件与语义条件，独立项分别检查。不得扩大原始返回；后续行动合理性归 EG-1。
+judge_rules: |-
+  当前 rubric：TU-3 Result Interpretation／工具结果解读正确性。
+  输入应包含原始工具返回、Agent 可观察的解释，以及必要的字段语义。
+  二元问题：Agent 对当前工具结果的解释是否忠实、正确？
+  yes：指定字段、状态、数值、错误码或空结果的含义被正确提取和表达。
+  no：存在可定位的误读、反转、遗漏本项必需限定，或将错误/空结果解释为成功数据。
+  unverifiable：原始返回、解释或必要字段语义缺失，无法比对。
+  不要把工具结果为坏消息判成解读错误。解释后的行动合理性归 EG-1；不同字段的独立解释应分别实例化。
+
+  本阶段仅返回 status 和 verdict，不生成解释或证据明细。
+programmatic_handler: assertions
+program_contract: |-
+  params={items:[{id,actual_path,op,expected|expected_path}],aggregation:'all'}.
+
+  Supported operators: eq/ne/in/contains/gt/lt/gte/lte/approx/exists/set_equal/json_valid.
+  json_valid parses the actual final text directly; it does not accept an
+  agent's self-reported format flag and rejects non-JSON NaN/Infinity constants.
+  exists may score missing data only with complete_parent_path pointing to a
+  trusted adapter's True completeness flag. expected_path is evaluator-selected:
+  it can address reference facts OR a trusted tool result/environment snapshot,
+  but cannot equal actual_path. The adapter must distinguish observed agent
+  claims from trusted observations; the evaluator must choose the latter.
+  Missing observed values otherwise return Unverifiable, not False or zero.

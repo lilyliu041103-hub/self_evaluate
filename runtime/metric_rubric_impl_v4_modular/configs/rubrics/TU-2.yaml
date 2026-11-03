@@ -1,0 +1,40 @@
+id: TU-2
+metric_id: TU
+name: Call & Argument Validity
+name_zh: 调用与参数有效性
+definition: 当前调用的协议、参数结构和指定参数语义是否均符合要求？
+boundary: 协议与 schema 用程序；语义对象与取值需任务真值。工具自身故障不等于调用错误。
+inputs:
+- 工具调用
+- 接口 schema
+- 参数对应的任务约束和来源
+default_method: P
+allowed_methods:
+- P
+- J
+- H
+instantiate_prompt: |-
+  按调用或独立参数义务拆分。协议/schema 用 P，限定 criterion 仅评价协议时显式设置 schema_only:true；对象、取值、范围和来源等参数语义默认单独用 J，只有完整可信对象映射或真值可直接比较时才用 P。整次调用确需同时满足协议和语义时可用 H，程序 schema_only 与 Judge 语义分工明确；不能用 schema 通过宣称语义正确，也不能以程序匹配自然语言替代语义判断。工具自身故障不等于调用错误。
+judge_rules: |-
+  当前 rubric：TU-2 Call & Argument Validity／调用与参数有效性（语义检查）。
+  输入应包含待查参数、任务要求、参数来源或可信对象映射。独立 J 只评当前参数语义条件；H 中程序 schema 校验结果只能引用，不能推翻适用且可靠的确定性失败。
+  二元问题：当前参数的语义、目标对象或范围是否符合指定任务要求？
+  yes：本次待查参数满足任务要求，其对象、取值和必要来源均有依据。
+  no：有证据表明参数取值、目标对象、操作范围或必要来源不符合要求。
+  unverifiable：缺少任务到对象的映射、参数来源或适用范围，无法确定是否选对。
+  允许任务明确授权的默认值，不允许编造对象、日期或数量。类型合规不等于语义正确，服务超时不等于参数错误。多个独立参数应分别实例化；明确要求整次调用参数全部合格时，任一不合格即判否。
+
+  本阶段仅返回 status 和 verdict，不生成解释或证据明细。
+programmatic_handler: call_arguments
+program_contract: |-
+  params={call_path:'/observation/events/0',schema:{...JSON Schema...},
+    required_fields:['id','tool','arguments'],semantic_assertions:[...assertions items...]}
+
+  Validates protocol fields and JSON Schema (with format checking), then task
+  semantics. schema_only:true explicitly restricts this programmatic component
+  to syntax, for a standalone P check whose criterion only covers protocol/schema,
+  or for a Hybrid check with a separate semantic judge. Without either
+  semantic_assertions or schema_only:true it cannot claim semantic correctness.
+  Optional protocol_schema validates the entire normalized call envelope,
+  including additional transport fields. Without it the built-in envelope
+  contract only covers nonempty id/tool, object arguments, and field presence.

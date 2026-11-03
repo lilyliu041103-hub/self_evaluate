@@ -1,0 +1,10 @@
+{
+  "instantiate": {
+    "config_path": "model-api.local.json",
+    "max_tokens": 32768
+  },
+  "score": {
+    "config_path": "model-api.local.json",
+    "max_tokens": 4096
+  }
+}

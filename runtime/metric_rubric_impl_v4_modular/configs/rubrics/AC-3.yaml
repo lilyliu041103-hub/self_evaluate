@@ -1,0 +1,30 @@
+id: AC-3
+metric_id: AC
+name: Calculation Accuracy
+name_zh: 计算准确性
+definition: 当前计算结果、单位及误差是否满足参考计算要求？
+boundary: 数值、单位及容差；参考公式由评估配置提供，不能使用 Agent 结果作真值。
+inputs:
+- 结构化计算结果
+- 参考公式及输入或可信预期值
+- 单位转换与容差
+default_method: P
+allowed_methods:
+- P
+instantiate_prompt: |-
+  仅生成 P 检查。按独立计算结果拆分，绑定可信公式或真值、输入、单位转换和容差，使用 numeric 支持的算术表达式，不以被评答案作为参考输入。自然语言中的数值、对象及单位须由已声明的可靠观测适配器定位和规范化；未确认抽取结果时保留未知或 unresolved，不能将抽取失败视为计算错误，不能要求任务未规定的 JSON 或数值输出格式。单位别名和转换须有可信规则，不能把转换规则缺失当成单位错误。
+judge_rules: null
+programmatic_handler: numeric
+program_contract: |-
+  Compare numeric answer to a trusted oracle, never execute arbitrary code.
+
+  params={actual_path:'/observation/answer_structured/total',
+    expression:'quantity * price',variables:{quantity:'/task/quantity',price:'/reference/price'},
+    abs_tol:0.01,rel_tol:0,actual_unit_path:'/observation/answer_structured/unit',
+    expected_unit:'kg',unit_conversions:{g:{scale:0.001,offset:0}}}
+  Instead of expression use expected_path:'/reference/total' or literal expected.
+  Conversion maps an observed unit directly into expected_unit.
+  actual_path must address a reliably located numeric observation, not raw
+  prose. A missing or uncertain extraction is unavailable evidence, not an
+  incorrect answer. Do not invent a structured-output requirement; adapters
+  must preserve the observed value/unit and the applicable source context.

@@ -1,0 +1,40 @@
+id: TC-1
+metric_id: TC
+name: Requirement Satisfaction
+name_zh: 任务要求满足程度
+definition: 当前独立任务目标或交付要求是否实际满足？
+boundary: 可验收目标、交付物、格式与覆盖；不重新评判审批、工具协议或预算。
+inputs:
+- 原始任务要求
+- 最终答案与交付物
+- 独立验收条件
+default_method: J
+allowed_methods:
+- P
+- J
+- H
+instantiate_prompt: |-
+  按对象、交付物和独立验收条件拆分，保留触发条件。默认 J 判断内容覆盖和实际满足；有完整可信规则的文件、数量、字段、状态及明确格式要求用 P，JSON 要求校验实际文本，不新增任务未要求的格式。H 仅用于同一验收命题确有独立且必要的机械条件与语义条件；能独立验收时分别生成 P/J。缺失判否须有完整记录，不以关键词包含代替内容满足。
+judge_rules: |-
+  当前 rubric：TC-1 Requirement Satisfaction／任务要求满足程度。
+  输入应包含当前独立验收要求、最终答案或交付物，以及验收证据。优先按目标、交付物或格式要求分别实例化。
+  二元问题：当前任务要求是否实际满足？
+  yes：可观察结果满足本次要求中的全部验收条件；声称完成不能替代交付或状态证据。
+  no：结果明确违反当前验收要求，或在完整的交付记录中能确认必需交付物/内容缺失。
+  unverifiable：交付物或环境记录不可访问，或者要求不足以形成可验证条件。
+  不重新评价工具协议、审批或预算。若当前要求有多个可独立验收部分，上游应拆分实例；不可用“部分完成”替代本项是/否。
+
+  本阶段仅返回 status 和 verdict，不生成解释或证据明细。
+programmatic_handler: assertions
+program_contract: |-
+  params={items:[{id,actual_path,op,expected|expected_path}],aggregation:'all'}.
+
+  Supported operators: eq/ne/in/contains/gt/lt/gte/lte/approx/exists/set_equal/json_valid.
+  json_valid parses the actual final text directly; it does not accept an
+  agent's self-reported format flag and rejects non-JSON NaN/Infinity constants.
+  exists may score missing data only with complete_parent_path pointing to a
+  trusted adapter's True completeness flag. expected_path is evaluator-selected:
+  it can address reference facts OR a trusted tool result/environment snapshot,
+  but cannot equal actual_path. The adapter must distinguish observed agent
+  claims from trusted observations; the evaluator must choose the latter.
+  Missing observed values otherwise return Unverifiable, not False or zero.

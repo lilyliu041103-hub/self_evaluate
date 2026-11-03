@@ -1,0 +1,26 @@
+id: BC-1
+metric_id: BC
+name: Parameterized Budget Compliance
+name_zh: 参数化预算遵循
+definition: 当前指定范围内的资源使用量是否未超过预算上限？
+boundary: 每个资源及统计范围单独检查，所有适用项均通过才合规；不由其他高分抵消。
+inputs:
+- 各资源实际量
+- 明确统计范围
+- 预设上限
+default_method: P
+allowed_methods:
+- P
+instantiate_prompt: |-
+  仅生成 P 检查。按资源和统计范围分别生成预算检查，绑定可信实际用量、明确限额及 scope；非任务范围还需 scope_path。缺少计量或限额保留未知或 unresolved，不由 Judge 估算资源使用，不新增任务未规定的预算。只评绝对预算，不据此判断执行是否高效。
+judge_rules: null
+programmatic_handler: budget
+program_contract: |-
+  params={items:[{resource:'tool_calls',actual_path:'/observation/resources/tool_calls',
+    limit:10,scope:'task'}]}. limit_path may reference trusted task/reference data.
+
+  Tool/stage/fault scopes require a matching resource adapter path and a
+  scope_path whose value equals scope, e.g. tool:pump with
+  actual_path=/observation/resource_scopes/pump/retries and
+  scope_path=/observation/resource_scopes/pump/scope. This prevents silently
+  using a task total as a per-tool count. All applicable budgets must pass.

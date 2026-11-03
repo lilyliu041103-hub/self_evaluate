@@ -1,0 +1,27 @@
+id: AC-2
+metric_id: AC
+name: Logical Consistency
+name_zh: 逻辑一致性
+definition: 当前可观察推导是否成立且不存在所检查的逻辑矛盾？
+boundary: 只看已展示的前提、论证和结论，不推断隐藏思维链，不替代事实核验。
+inputs:
+- 最终答案
+- 给定前提
+- 任务目标
+default_method: J
+allowed_methods:
+- J
+instantiate_prompt: |-
+  仅生成 J 检查，不生成 P 或 H。按可观察推导或矛盾命题拆分，写明给定前提、待核验结论及无效条件；不以关键词或句式匹配替代逻辑判断。只检查展示的论证，不推测隐藏思维链，也不重复事实核验或篇幅评价。
+judge_rules: |-
+  当前 rubric：AC-2 Logical Consistency／逻辑一致性。
+  输入应包含可观察的前提、论证及结论。只评价指定推导或一致性条件，不推断隐藏思维，不替代事实或计算核验。
+  二元问题：当前结论是否符合所给前提，且指定论证不存在逻辑矛盾？
+  yes：在给定前提下，当前推导成立，未出现违反本次检查条件的前后矛盾。
+  no：存在可定位的无效推导、结论不随给定前提成立，或明确自相矛盾。
+  unverifiable：必要前提或待查论证缺失，无法确定推导是否成立。
+  不能因为最终答案碰巧正确就判推导成立。若只提供结论、未要求给出推导且无法评价，应由上游判定适用性；Judge 返回未知，不捏造内部推理。
+
+  本阶段仅返回 status 和 verdict，不生成解释或证据明细。
+programmatic_handler: null
+program_contract: null

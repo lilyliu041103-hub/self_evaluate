@@ -1,0 +1,32 @@
+id: ER-1
+metric_id: ER
+name: Error Detection
+name_zh: 错误与异常识别
+definition: 当前异常是否在规定响应窗口内被识别并得到可观察响应？
+boundary: 已知异常及可观察识别行为；没有异常由配置判断 NA。
+inputs:
+- 已知异常事件
+- 识别事件
+- 响应窗口
+default_method: J
+allowed_methods:
+- P
+- J
+- H
+instantiate_prompt: |-
+  按明确异常生成识别检查，绑定故障、已规定的响应窗口与允许响应类型；不新增响应时限。自然语言承认或应对异常默认 J；可信日志已标注 fault_id、响应类型及时间时可 P。H 仅在同一异常识别要求的时间条件与语义响应确为互补必要部分、程序能表达其分工时使用；否则分别检查或保留缺口。不能因缺少标准事件标签判定未识别，不从最终成功倒推识别；没有异常由可信条件判定适用性。
+judge_rules: |-
+  当前 rubric：ER-1 Error Detection／错误与异常识别。
+  输入应包含已确认异常、当时可观察响应、必要关联上下文、记录完整性及任务规定的响应窗口。
+  二元问题：当前异常是否被识别，并在适用的响应窗口内得到可观察响应？
+  yes：可观察话语或行为明确识别本异常并按要求响应；存在响应时限时，可信时间证明响应未超过窗口。
+  no：有证据表明将异常当作正常结果继续处理、响应明确超时，或完整观察窗口内可确认必需响应缺失。
+  unverifiable：异常事实、响应记录、故障关联或适用时限的可信时间不足，无法确认识别与响应。未规定时限时不新增时间标准。
+  允许自然语言及等效识别行为，不要求任务未规定的事件类型/标签；没有标准标签不等于没有识别。没有异常的适用性由上游决定，不推测隐藏思维，也不把最终成功当成已识别证据。
+
+  本阶段仅返回 status 和 verdict，不生成解释或证据明细。
+programmatic_handler: error_detection
+program_contract: |-
+  ER-1: params={'faults':[{'fault_event_id':'f','response_window':5,
+  'accepted_kinds':['error_ack','recovery','escalation']}]}.
+  Matching response events must carry fault_id='f'. Window end is inclusive.

@@ -1,0 +1,33 @@
+id: EG-2
+metric_id: EG
+name: Evidence Validity & Freshness
+name_zh: 证据有效性与时效性
+definition: 当前证据的来源、版本与时效是否满足指定要求？
+boundary: 证据自身来源、版本和时效；不重复计分状态传播错误。
+inputs:
+- 证据来源、版本、时间
+- 决策时间
+- 允许源、版本和有效期规则
+default_method: P
+allowed_methods:
+- P
+- J
+instantiate_prompt: |-
+  按证据及使用行动生成检查，绑定明确的来源、版本或最大年龄规则。元数据和规则完整可机械比较时优先 P；来源资质、版本适用范围等须理解自然语言时用 J，仍须提供可信规则与元数据，不能由 Judge 补造。时效采用 observed_at，不以刚检索的时间代替；后续状态传播归 PE-3。
+judge_rules: |-
+  当前 rubric：EG-2 Evidence Validity & Freshness／证据有效性与时效性。
+  输入应包含证据来源、版本、实际观测时间、使用行动时间及本项适用的可信来源/版本/有效期规则。
+  二元问题：当前证据是否满足指定来源、版本与时效要求？
+  yes：所有本项已配置要求均有证据满足，包括来源资质、版本适用性和使用时仍在有效期内。
+  no：可信记录明确显示来源不被允许、版本不适用或超出规定有效期。
+  unverifiable：必要规则、来源身份、版本或时间缺失/含义不明，或相互冲突而无裁决依据。未配置的维度不擅自增加要求。
+  新近获取不等于数据新鲜；使用实际观测时间，不补造时间或默认有效期。来源/版本缺少证据不能自动证明无效；状态传播错误归 PE-3。
+
+  本阶段仅返回 status 和 verdict，不生成解释或证据明细。
+programmatic_handler: evidence_freshness
+program_contract: |-
+  EG-2: params={'checks':[{'evidence_id':'e','action_id':'a','max_age':60,
+  'allowed_sources':['sensor'], 'version':'v1'}]}.
+
+  max_age uses evidence.observed_at, not acquisition time, to avoid treating
+  freshly retrieved old data as fresh. Every check needs >=1 explicit policy.

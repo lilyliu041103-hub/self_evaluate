@@ -1,0 +1,27 @@
+id: TU-1
+metric_id: TU
+name: Tool Selection
+name_zh: 工具选择正确性
+definition: 当前所选工具是否具备指定操作所需的合法能力？
+boundary: 当前操作与工具能力匹配，接受等效合法工具；参数归 TU-2。
+inputs:
+- 待执行操作
+- 工具能力规范及限制
+- 实际调用
+default_method: J
+allowed_methods:
+- J
+instantiate_prompt: |-
+  仅生成 J 检查，不生成 P 或 H。按操作所需能力生成检查，绑定实际调用和可信工具规范，由 Judge 比较操作意图、能力与限制，接受等效合法工具；不以工具名称等于参考轨迹或关键词匹配替代能力判断。缺少能力规范保留未知，参数约束归 TU-2。
+judge_rules: |-
+  当前 rubric：TU-1 Tool Selection／工具选择正确性。
+  输入应包含当前待执行操作、可用工具的能力规范及限制，以及实际选用工具。
+  二元问题：当前选择的工具是否能够合法完成指定操作？
+  yes：所选工具具备所需能力且符合本次明确工具限制；允许能力等效的合法替代工具。
+  no：工具能力与当前操作不匹配，或违反已提供的明确工具限制。
+  unverifiable：缺少工具能力规范、操作目标或限制信息，无法可靠判断。
+  不以工具名称与某条参考轨迹完全相同为唯一标准。参数归 TU-2，重复但能力匹配的调用是否必要归 EE-4。
+
+  本阶段仅返回 status 和 verdict，不生成解释或证据明细。
+programmatic_handler: null
+program_contract: null

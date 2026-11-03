@@ -1,0 +1,33 @@
+id: ER-2
+metric_id: ER
+name: Recovery Strategy Correctness
+name_zh: 恢复策略正确性
+definition: 当前故障的实际恢复策略是否属于允许策略？
+boundary: 恢复动作类型及策略合规；重试次数上限复用 BC-1。
+inputs:
+- 故障类型
+- 允许恢复策略
+- 实际恢复动作
+default_method: J
+allowed_methods:
+- P
+- J
+instantiate_prompt: |-
+  按故障及可信允许策略生成恢复检查，绑定故障关联与适用条件。策略需从自然语言动作或政策理解时默认 J；完整可信策略枚举、故障关联及恢复事件可直接比较时用 P。检查全部恢复尝试，不只看最后一次；不以缺少标准策略标签判错，也不由 Judge 自行发明允许策略。重试预算归 BC-1，恢复终态归 ER-3。
+judge_rules: |-
+  当前 rubric：ER-2 Recovery Strategy Correctness／恢复策略正确性。
+  输入应包含故障、可信允许恢复策略及适用条件、所有相关恢复尝试与关联记录。
+  二元问题：当前故障的实际恢复尝试是否均属于允许策略并满足相应条件？
+  yes：本项所有恢复尝试均与允许策略语义一致且满足适用条件，接受等效合法实施方式。
+  no：至少一次可观察恢复尝试使用被禁止或不适用的策略；不能由最后一次合法恢复抵消此前违规尝试。
+  unverifiable：允许策略、适用条件、故障关联或足以覆盖全部尝试的记录缺失，无法判断。不能自行把常见重试、降级或终止当成已被授权。
+  不把恢复失败本身判为策略错误；没有恢复尝试的适用性与必需恢复义务按任务决定，不自动通过或判否。恢复终态归 ER-3，重试次数预算归 BC-1。
+
+  本阶段仅返回 status 和 verdict，不生成解释或证据明细。
+programmatic_handler: recovery_strategy
+program_contract: |-
+  ER-2: params={'faults':[{'fault_event_id':'f',
+  'allowed_strategies':['retry','escalate','stop']}]}.
+  Recovery events: {kind:'recovery', fault_id:'f', strategy:'retry', ...}.
+  Every observed recovery attempt must be allowed, not just the final one.
+  Retry counts belong to BC-1, not this checker.

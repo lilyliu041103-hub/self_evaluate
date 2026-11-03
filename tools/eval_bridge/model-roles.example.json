@@ -1,0 +1,12 @@
+{
+  "instantiate": {
+    "config_path": "../../model-api.local.json",
+    "model": "deepseek-flash",
+    "max_tokens": 16384
+  },
+  "score": {
+    "config_path": "../../model-api.local.json",
+    "model": "deepseek-flash",
+    "max_tokens": 4096
+  }
+}

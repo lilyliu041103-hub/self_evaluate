@@ -1,0 +1,385 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "v4 routed task-specific atomic rubric plan",
+  "description": "Structural checks only; semantic coverage and source correctness also require validation/review.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "requirements",
+    "assignments",
+    "checks",
+    "unresolved"
+  ],
+  "properties": {
+    "requirements": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "text",
+          "source_refs"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source_refs": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "path",
+                "quote"
+              ],
+              "properties": {
+                "path": {
+                  "type": "string",
+                  "pattern": "^/(task|reference)(/|$)"
+                },
+                "quote": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      },
+      "minItems": 1
+    },
+    "checks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "metric_id",
+          "rubric_id",
+          "method",
+          "criterion",
+          "requirement_ids",
+          "code",
+          "prompt",
+          "bindings",
+          "input_paths",
+          "when",
+          "hard",
+          "required_for_success"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "metric_id": {
+            "enum": [
+              "AC",
+              "TC",
+              "TU",
+              "PE",
+              "EG",
+              "ER",
+              "EE",
+              "HC",
+              "BC"
+            ]
+          },
+          "rubric_id": {
+            "enum": [
+              "AC-1",
+              "AC-2",
+              "AC-3",
+              "TC-1",
+              "TU-1",
+              "TU-2",
+              "TU-3",
+              "PE-1",
+              "PE-2",
+              "PE-3",
+              "EG-1",
+              "EG-2",
+              "ER-1",
+              "ER-2",
+              "ER-3",
+              "EE-4",
+              "HC-1",
+              "HC-2",
+              "HC-3",
+              "HC-4",
+              "BC-1"
+            ]
+          },
+          "method": {
+            "enum": [
+              "P",
+              "J",
+              "H"
+            ]
+          },
+          "criterion": {
+            "type": "string",
+            "minLength": 1
+          },
+          "requirement_ids": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "maxItems": 1
+          },
+          "code": {
+            "enum": [
+              "assertions",
+              "numeric",
+              "tool_selection",
+              "call_arguments",
+              "budget",
+              "dependency_order",
+              "action_grounding",
+              "evidence_freshness",
+              "error_detection",
+              "recovery_strategy",
+              "approval_recall",
+              "approval_precision",
+              "approval_timing",
+              "decision_compliance",
+              null
+            ]
+          },
+          "prompt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1,
+            "description": "Task-specific scoring instructions, never a prompt file path."
+          },
+          "bindings": {
+            "type": "object"
+          },
+          "input_paths": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "pattern": "^/(task|observation|reference)(/|$)"
+            }
+          },
+          "when": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "path",
+                  "op",
+                  "expected"
+                ],
+                "properties": {
+                  "path": {
+                    "type": "string",
+                    "pattern": "^/(task|observation|reference)(/|$)"
+                  },
+                  "op": {
+                    "enum": [
+                      "eq",
+                      "ne",
+                      "in",
+                      "contains",
+                      "gte",
+                      "lte",
+                      "gt",
+                      "lt",
+                      "exists"
+                    ]
+                  },
+                  "expected": {}
+                }
+              }
+            ]
+          },
+          "hard": {
+            "type": "boolean"
+          },
+          "required_for_success": {
+            "type": "boolean"
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "method": {
+                  "const": "P"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "code": {
+                  "type": "string"
+                },
+                "prompt": {
+                  "type": "null"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "method": {
+                  "const": "J"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "code": {
+                  "type": "null"
+                },
+                "prompt": {
+                  "type": "string"
+                },
+                "bindings": {
+                  "maxProperties": 0
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "method": {
+                  "const": "H"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "code": {
+                  "type": "string"
+                },
+                "prompt": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    "unresolved": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "requirement_id",
+          "metric_id",
+          "missing"
+        ],
+        "properties": {
+          "requirement_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "metric_id": {
+            "enum": [
+              "AC",
+              "TC",
+              "TU",
+              "PE",
+              "EG",
+              "ER",
+              "EE",
+              "HC",
+              "BC"
+            ]
+          },
+          "missing": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    },
+    "assignments": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "requirement_id",
+          "metric_id",
+          "rubric_id"
+        ],
+        "properties": {
+          "requirement_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "metric_id": {
+            "enum": [
+              "AC",
+              "TC",
+              "TU",
+              "PE",
+              "EG",
+              "ER",
+              "EE",
+              "HC",
+              "BC"
+            ]
+          },
+          "rubric_id": {
+            "enum": [
+              "AC-1",
+              "AC-2",
+              "AC-3",
+              "TC-1",
+              "TU-1",
+              "TU-2",
+              "TU-3",
+              "PE-1",
+              "PE-2",
+              "PE-3",
+              "EG-1",
+              "EG-2",
+              "ER-1",
+              "ER-2",
+              "ER-3",
+              "EE-4",
+              "HC-1",
+              "HC-2",
+              "HC-3",
+              "HC-4",
+              "BC-1"
+            ]
+          }
+        }
+      }
+    }
+  }
+}

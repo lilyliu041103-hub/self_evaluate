@@ -1,0 +1,5 @@
+{
+  "base_url": "https://your-provider.example/v1",
+  "api_key": "YOUR_API_KEY",
+  "model": "YOUR_MODEL_NAME"
+}

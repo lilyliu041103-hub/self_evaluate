@@ -1,0 +1,40 @@
+id: ER-3
+metric_id: ER
+name: Recovery Outcome Integrity
+name_zh: 恢复结果与状态完整性
+definition: 当前恢复验收条件、状态不变量或副作用要求是否满足？
+boundary: 允许恢复或安全终止、状态不变量及副作用；不等同于原始任务成功。
+inputs:
+- 恢复后状态
+- 允许终态
+- 不变量与副作用记录
+default_method: P
+allowed_methods:
+- P
+- J
+- H
+instantiate_prompt: |-
+  将恢复终态、状态不变量和禁止副作用分别生成检查，绑定允许恢复或安全终止规则。结构化真实状态、不变量和完整副作用记录可直接比较时优先 P；恢复说明及语义条件用 J，不能把 Agent 自报恢复成功作为真值。H 只用于同一条件的互补必要部分；程序不能验证的语义不强行转成字符串断言。恢复合规不等于原任务完成。
+judge_rules: |-
+  当前 rubric：ER-3 Recovery Outcome Integrity／恢复结果与状态完整性（语义分支）。
+  输入应包含恢复后的可观察状态、当前待查恢复验收条件、允许终态及副作用证据。
+  二元问题：当前恢复验收条件是否满足？
+  yes：证据显示目标恢复条件或规定不变量满足；若允许安全终止，合法安全终止也可满足本项。
+  no：存在明确不允许的恢复状态、不变量被破坏，或本项禁止的重复执行/写入等副作用。
+  unverifiable：恢复状态或副作用日志缺失，无法证明满足或违反。
+  按恢复终态、不变量或副作用条件分别实例化。安全终止可以通过恢复要求但未完成原任务；原任务完成由 TC 单独检查。
+
+  本阶段仅返回 status 和 verdict，不生成解释或证据明细。
+programmatic_handler: assertions
+program_contract: |-
+  params={items:[{id,actual_path,op,expected|expected_path}],aggregation:'all'}.
+
+  Supported operators: eq/ne/in/contains/gt/lt/gte/lte/approx/exists/set_equal/json_valid.
+  json_valid parses the actual final text directly; it does not accept an
+  agent's self-reported format flag and rejects non-JSON NaN/Infinity constants.
+  exists may score missing data only with complete_parent_path pointing to a
+  trusted adapter's True completeness flag. expected_path is evaluator-selected:
+  it can address reference facts OR a trusted tool result/environment snapshot,
+  but cannot equal actual_path. The adapter must distinguish observed agent
+  claims from trusted observations; the evaluator must choose the latter.
+  Missing observed values otherwise return Unverifiable, not False or zero.

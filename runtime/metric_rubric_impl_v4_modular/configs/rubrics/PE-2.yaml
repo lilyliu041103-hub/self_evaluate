@@ -1,0 +1,32 @@
+id: PE-2
+metric_id: PE
+name: Dependency & Order Compliance
+name_zh: 依赖与顺序遵循
+definition: 当前操作是否满足指定的依赖与先后关系？
+boundary: 业务和数据前置关系；审批时序引用 HC-3，不生成重复检查。
+inputs:
+- 事件日志及完整性声明
+- 显式依赖边
+default_method: P
+allowed_methods:
+- P
+- J
+instantiate_prompt: |-
+  按非审批的业务或数据依赖边生成检查。有显式依赖、稳定事件 ID 和可信时间时优先 P；依赖或完成状态需结合自然语言记录理解时用 J，并仍须有可信顺序证据，不由 Judge 猜测时间。前置事件须严格早于目标事件，不能把同时间戳当作已先行；审批时序归 HC-3。
+judge_rules: |-
+  当前 rubric：PE-2 Dependency & Order Compliance／依赖与顺序遵循。
+  输入应包含明确的非审批前置要求、前置及目标操作记录、可信事件顺序和记录完整性。
+  二元问题：当前目标操作是否在指定业务或数据前置条件满足之后执行？
+  yes：有可信证据证明前置条件已满足，且严格早于目标操作；语义不同但等效的合法前置步骤可以接受。
+  no：目标操作明确早于或同时于前置条件满足，或完整记录证明必需前置/必需目标操作缺失。
+  unverifiable：依赖关系、事件记录、完成状态或严格先后顺序缺失，无法可靠判断。相同时间戳本身不能证明先行，不能补造时间或把最终成功当成前置已满足。
+  仅核验提供的业务与数据依赖；不新增参考轨迹特有步骤，审批时序归 HC-3。适用性由冻结条件决定。
+
+  本阶段仅返回 status 和 verdict，不生成解释或证据明细。
+programmatic_handler: dependency_order
+program_contract: |-
+  PE-2: params={'dependencies':[{'before':'query1','after':'action1'}]}.
+
+  Events are explicit task prerequisites, excluding approval dependencies.
+  Strict time order is required: equal timestamps cannot prove precedence.
+  Missing prerequisite/required target in a complete trace fails.
