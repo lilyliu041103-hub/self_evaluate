@@ -1,0 +1,33 @@
+{
+  "schema": "aims-literals/1",
+  "values": {
+    "fragment_1": {
+      "type": "scalar",
+      "value": "Read the source if no suitable excerpt is shown. Copy an exact substring supporting the same rule; do not change the criterion to evade validation."
+    },
+    "fragment_2": {
+      "type": "scalar",
+      "value": "Locator inventory of stored observations. Read payload_refs and nested evidence_ref. For omitted events query scope=observation, kinds=[trace_event] with pagination."
+    },
+    "fragment_3": {
+      "type": "scalar",
+      "value": "TU-2 call_path must be an adapted tool call or tool event payloads/input/value; output is not a call"
+    },
+    "fragment_4": {
+      "type": "scalar",
+      "value": "AC-3 literal expected needs explicit reference configuration; use expected_path or a trusted formula"
+    },
+    "fragment_5": {
+      "type": "scalar",
+      "value": "Rubric membership is validated locally; semantic object coverage follows each profile guide and still requires examination."
+    },
+    "fragment_6": {
+      "type": "scalar",
+      "value": "Return a corrected full candidate. Recheck all schema, source quotes, evidence-kind membership, snapshot scope and program binding contracts. Do not change the fixed rubric rules or remove applicable requirements to evade validation."
+    },
+    "fragment_7": {
+      "type": "scalar",
+      "value": "Return a corrected full candidate. Cover every named attempt, including malformed and unexecuted actions. Read available contracts and add TU-2 P/H schema checks. If only protocol defects can be established, use a protocol_only P check. Preserve independent semantic checks and genuine unresolved prerequisites. A named source snapshot assesses that reference version."
+    }
+  }
+}

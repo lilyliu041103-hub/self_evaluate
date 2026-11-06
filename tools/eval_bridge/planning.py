@@ -1,5 +1,6 @@
 """Local evidence preparation and binding of validated run-specific checks."""
 from __future__ import annotations
+from .resources import literal as _fragment
 
 import copy
 import hashlib
@@ -14,15 +15,18 @@ from .profiles import load_profiles, required_evidence_for_method
 
 def engine_fingerprint(engine):
     engine = Path(engine)
+    from .resource_paths import asset_files, ENGINE
     files = sorted([*engine.glob('adaptive_eval/*.py'), *engine.glob('configs/**/*.yaml'),
                     *engine.glob('prompts/**/*.txt')])
-    return digest({p.relative_to(engine).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest() for p in files})
+    if engine.resolve() == ENGINE: files += asset_files()
+    return digest({__import__('os').path.relpath(p, engine).replace('\\', '/'): hashlib.sha256(p.read_bytes()).hexdigest() for p in files})
 
 
 def adapter_fingerprint():
     package = Path(__file__).parent
-    files = [*package.glob('*.py'), package.parent / 'agentos_metric_adapter.py']
-    return digest({p.relative_to(package.parent).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest()
+    from .resource_paths import asset_files
+    files = [*package.glob('*.py'), package.parent / 'agentos_metric_adapter.py', *asset_files()]
+    return digest({__import__('os').path.relpath(p, package.parent).replace('\\', '/'): hashlib.sha256(p.read_bytes()).hexdigest()
                    for p in sorted(files)})
 
 
@@ -85,7 +89,7 @@ def prepare(source, out, engine, observation=None, task_id=None, bindings=None, 
             'methods': methods,
             'selection_policy': {'small_table_limit': 40, 'focus': 'exact identifier-column values present in task request; no status/version filtering'},
             'preparation': {'method': 'fixed_library_contracts', 'model_calls': 0,
-                            'note': 'No task-specific model-generated rubric or gold. Fixed rubric boundaries and methods are retained; missing program bindings remain unverifiable.'}}
+                            'note': _fragment('prompts/bridge/fragments/planning.json', 'fragment_1')}}
     plan['plan_hash'] = digest(plan)
     out.mkdir(parents=True, exist_ok=True)
     write_json(out / 'evidence.json', records)
@@ -190,7 +194,7 @@ def initial_reference_ids(store, request, small_table_limit=40):
         selection.append({'table_id': table, 'selected': len(chosen), 'available': len(eids),
                           'mode': mode, 'all_rows_included': len(chosen) == len(eids)})
     return ids, {'focus_values': sorted(focus_values), 'tables': selection, 'tool_contracts': tool_selection,
-                 'note': 'Initial view only. All omitted rows remain queryable; unviewed data cannot establish absence or completeness.'}
+                 'note': _fragment('prompts/bridge/fragments/planning.json', 'fragment_2')}
 
 
 def contract_assessment(specification, records):
@@ -218,7 +222,7 @@ def contract_assessment(specification, records):
     return {'contracts': contracts,
             'has_unverified_source_snapshot': any(c['basis'] == 'source_snapshot' and
                 c['historical_version_match'] not in ('verified', 'matched') for c in contracts),
-            'scope_note': 'Source-snapshot checks assess the named reference version. They do not establish the deployed historical version or execution authorization.'}
+            'scope_note': _fragment('prompts/bridge/fragments/planning.json', 'fragment_3')}
 
 
 def bind_observation(plan, store, engine):
@@ -284,9 +288,9 @@ def bind_observation(plan, store, engine):
                        'contract_assessment': contract_assessment(specification, store.records),
                        'selection': ({'mode': 'run_instance',
                                       'observation_ids': copy.deepcopy(specification['observation_ids']),
-                                      'trace_policy': 'Only explicitly bound records, their schemas/span headers, task request and run status. Follow references or query supplemental evidence; a bounded packet cannot prove absence.'}
+                                      'trace_policy': _fragment('prompts/bridge/fragments/planning.json', 'fragment_4')}
                                      if runtime else {**selection, 'mode': 'static_template_preview',
-                                      'trace_policy': 'All event headers; output/error payload views. Inputs, metadata and large fields remain retrievable by evidence_ref or query. This initial packet is not the full trace.'}),
+                                      'trace_policy': _fragment('prompts/bridge/fragments/planning.json', 'fragment_5')}),
                        'applicability_policy': profile['applicability_policy']})
     return checks, ({'mode': 'run_instance', 'run_fingerprint': plan['run_fingerprint'],
                      'check_count': len(checks), 'note': 'Each instance keeps its own observation IDs.'}

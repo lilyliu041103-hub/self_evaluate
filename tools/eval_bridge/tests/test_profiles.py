@@ -14,7 +14,7 @@ import yaml
 ROOT = Path(__file__).resolve().parents[3]
 ENGINE = ROOT / "runtime/metric_rubric_impl_v4_modular"
 MODULE = ROOT / "tools/eval_bridge/profiles.py"
-SPEC = importlib.util.spec_from_file_location("rubric_profiles_under_test", MODULE)
+SPEC = importlib.util.spec_from_file_location("eval_bridge.rubric_profiles_under_test", MODULE)
 profiles = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(profiles)
 
@@ -23,7 +23,7 @@ class ProfileContracts(unittest.TestCase):
     def test_all_22_configured_templates_are_preserved(self):
         loaded = profiles.load_profiles(ENGINE)
         self.assertEqual(len(loaded), 22)
-        self.assertEqual({p["id"] for p in loaded}, {p.stem for p in (ENGINE / "configs/rubrics").glob("*.yaml")})
+        self.assertEqual({p["id"] for p in loaded}, {p.stem for p in (ROOT / "rubrics/templates").glob("*.yaml")})
         for profile in loaded:
             source = ENGINE / profile["source_path"]
             raw = source.read_bytes()

@@ -1,0 +1,1 @@
+Evidence retrieval has reached its configured round limit. Return the final JSON for the original request now using the evidence already received. Do not request further tools. Preserve unresolved prerequisites or unverifiable judgments where evidence is insufficient; do not invent facts or infer absence from unread data.

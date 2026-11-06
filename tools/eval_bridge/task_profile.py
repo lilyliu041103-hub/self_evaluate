@@ -1,4 +1,4 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 """Task-level capability profile -> rubric applicability.
 
 Applicability is decided from what the task asks for, never from "the run did
@@ -6,6 +6,7 @@ not happen to produce this event".  A requirement marked ``required`` keeps the
 rubric applicable even when no evidence exists, so a missing capability shows up
 as a coverage gap instead of silently disappearing.
 """
+from .resources import text as _resource_text, literal as _resource_literal
 
 import hashlib
 import json
@@ -16,25 +17,10 @@ LEVELS = ("required", "optional", "not_required", "unspecified")
 REQUIREMENTS = ("tool_use", "human_approval", "error_recovery", "budget", "planning",
                 "knowledge_retrieval")
 
-GATES = {
-    "AC-1": None, "AC-2": None, "AC-3": None, "TC-1": None, "EE-4": None,
-    "EG-1": None, "EG-2": None, "EG-3": None,
-    "TU-1": "tool_use", "TU-2": "tool_use", "TU-3": "tool_use",
-    "PE-1": "planning", "PE-2": "planning", "PE-3": "planning",
-    "ER-1": "error_recovery", "ER-2": "error_recovery", "ER-3": "error_recovery",
-    "HC-1": "human_approval", "HC-3": "human_approval", "HC-4": "human_approval",
-    "HC-2": None,
-    "BC-1": "budget",
-}
+GATES = _resource_literal('rubrics/task-profile/task_profile.json', 'GATES')
 
 # Which rubric families prove a capability actually appeared in a run.
-EVIDENCE_OF = {
-    "tool_use": ("TU-1", "TU-2", "TU-3"),
-    "planning": ("PE-1", "PE-2", "PE-3"),
-    "error_recovery": ("ER-1", "ER-2", "ER-3"),
-    "human_approval": ("HC-1", "HC-2", "HC-3", "HC-4"),
-    "budget": ("BC-1",),
-}
+EVIDENCE_OF = _resource_literal('rubrics/task-profile/task_profile.json', 'EVIDENCE_OF')
 
 
 class ProfileError(ValueError):

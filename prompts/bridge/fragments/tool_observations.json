@@ -1,0 +1,17 @@
+{
+  "schema": "aims-literals/1",
+  "values": {
+    "fragment_1": {
+      "type": "scalar",
+      "value": "{v0}/response_format/json_schema/schema/properties/action/anyOf/{v1}/properties/tool_calls/items/anyOf/{v2}"
+    },
+    "fragment_2": {
+      "type": "scalar",
+      "value": "Call/result order is recorded in this input history; request time is an upper bound, not execution time."
+    },
+    "fragment_3": {
+      "type": "scalar",
+      "value": "Derived only from original event payloads. Source snapshot contracts do not prove historical deployment or permission."
+    }
+  }
+}

@@ -18,3 +18,21 @@ outputs/
 *.log
 migration-record.json
 /tools/verify_tool_integration.py
+
+# Benchmark data remains local; builders live under tools/.
+/benchmarks/
+# Management records, archives and patch artifacts
+AGENTS.md
+COMMIT.md
+PROGRESS.md
+EXPERIENCE.md
+STRUCTURE.md
+STRUCTURES.md
+/runs/
+/traces/
+*.bak
+*.cbak
+fix-cli-log.txt
+
+# Vendored upstream harness, excluded from this repository
+/third_party/

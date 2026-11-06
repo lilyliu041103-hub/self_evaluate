@@ -1,0 +1,10 @@
+# Verified optional tool dependencies; Python 3.12.7
+annotated-types==0.8.0
+certifi==2026.10.23
+charset-normalizer==3.5.2
+idna==3.20
+pydantic==2.13.4
+pydantic_core==2.46.4
+requests==2.34.2
+typing-inspection==0.4.5
+urllib3==2.8.0

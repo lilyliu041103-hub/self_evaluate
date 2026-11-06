@@ -1,0 +1,17 @@
+{
+  "schema": "aims-literals/1",
+  "values": {
+    "fragment_1": {
+      "type": "scalar",
+      "value": "Instantiate checks from the actual run and validate locally; exports a request unless --model-roles is given"
+    },
+    "fragment_2": {
+      "type": "scalar",
+      "value": "Score requires a locally validated runtime plan for this exact run. Run instantiate first and supply --plan; use --template-preview only for offline template diagnostics."
+    },
+    "fragment_3": {
+      "type": "scalar",
+      "value": "Local immutable evidence files, not provider cache handles. Provider reuse requires the identical preceding context and pack order; pack_prefixes records cumulative request prefixes."
+    }
+  }
+}

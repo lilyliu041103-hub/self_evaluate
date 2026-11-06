@@ -1,5 +1,6 @@
 """Route requirements once, specialize each rubric, review and freeze the plan."""
 from __future__ import annotations
+from .resources import resource as _resource, resource_files as _resource_files, PROJECT as _PROJECT
 
 import copy
 import json
@@ -52,7 +53,7 @@ def build_routing_request(input_data):
     library = load_library()
     index = _rubric_index(library)
     return _request("route", context,
-                    (ROOT / "prompts/routing.txt").read_text(encoding="utf-8"),
+                    (_resource('prompts/routing.txt')).read_text(encoding="utf-8"),
                     {**context, "metrics": library["metrics"], "rubric_index": index,
                      "output_schema": _subschema("requirements", "assignments", "unresolved")})
 
@@ -86,7 +87,7 @@ def build_rubric_request(input_data, routing, rubric_id):
         raise PlanError("Cannot instantiate a rubric with no assigned requirements")
     ids = {a["requirement_id"] for a in assignments}
     requirements = [r for r in routing["requirements"] if r["id"] in ids]
-    system = ((ROOT / "prompts/instantiation.txt").read_text(encoding="utf-8")
+    system = ((_resource('prompts/instantiation.txt')).read_text(encoding="utf-8")
               + "\n\n当前 rubric 的实例化规则：\n" + rubric["instantiate_prompt"])
     # The local instruction already appears in system; do not send it twice.
     rubric_context = {key: value for key, value in rubric.items() if key != "instantiate_prompt"}
@@ -145,7 +146,7 @@ def build_review_request(input_data, candidate):
     selected = [{key: value for key, value in rubric.items() if key != "instantiate_prompt"}
                 for rubric in library["rubrics"] if rubric["id"] in selected_ids]
     return _request("review", context,
-                    (ROOT / "prompts/instantiation_review.txt").read_text(encoding="utf-8"),
+                    (_resource('prompts/instantiation_review.txt')).read_text(encoding="utf-8"),
                     {**context, "metrics": library["metrics"],
                      "rubric_index": _rubric_index(library), "rubric_library": selected, "plan": plan})
 

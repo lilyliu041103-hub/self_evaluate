@@ -1,0 +1,8 @@
+{
+  "schema": "aims-resource-layout/1",
+  "metrics": "metrics/metrics.yaml",
+  "rubrics": "rubrics/templates",
+  "prompts": "prompts",
+  "benchmarks": "benchmarks",
+  "third_party": "third_party/IndustryBench"
+}

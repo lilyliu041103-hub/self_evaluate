@@ -1,5 +1,6 @@
 """Local evidence storage. The model sees compact views, never the whole audit dump."""
 from __future__ import annotations
+from .resources import literal as _fragment
 
 import copy
 import hashlib
@@ -84,8 +85,7 @@ def build_evidence(original):
         data['contract_level'] = ('business' if isinstance(tool.get('input_schema'), (dict, bool)) else 'capability')
         data.setdefault('historical_version_match', 'unverified')
         data['reference_scope'] = 'packaged_source_snapshot'
-        data['applicability_note'] = ('This source snapshot is a declared reference, not proof of the tool version, '
-                                    'deployment, or permission in the observed execution. Keep its historical_version_match visible.')
+        data['applicability_note'] = (_fragment('prompts/bridge/fragments/evidence.json', 'fragment_1'))
         add(eid, 'reference', 'tool_contract', data,
             {'pointer': f'/reference/agent_tool_catalog/tools/{ti}',
              'package_path': tool.get('package_path'), 'package_sha256': tool.get('package_sha256')},
@@ -120,7 +120,7 @@ def build_evidence(original):
                       'header_assumption': 'first physical row; original cells remain available for verification',
                       'row_count': max(0, len(rows) - 1), 'date1904': workbook.get('date1904', '0'),
                       'merged_cells': sheet.get('merged_cells', []),
-                      'value_encoding': 'OOXML scalar strings; per-row types distinguish numbers, strings, booleans and errors; no formula recalculation.'}
+                      'value_encoding': _fragment('prompts/bridge/fragments/evidence.json', 'fragment_2')}
             schema_id = table_id + ':schema'
             add(schema_id, 'reference', 'table_schema', schema,
                 dict(source, pointer=base_pointer + f'/workbook/sheets/{si}'))

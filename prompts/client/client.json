@@ -1,0 +1,577 @@
+{
+  "schema": "aims-literals/1",
+  "values": {
+    "TOOLS": {
+      "type": "list",
+      "value": [
+        {
+          "type": "dict",
+          "value": [
+            [
+              {
+                "type": "scalar",
+                "value": "type"
+              },
+              {
+                "type": "scalar",
+                "value": "function"
+              }
+            ],
+            [
+              {
+                "type": "scalar",
+                "value": "function"
+              },
+              {
+                "type": "dict",
+                "value": [
+                  [
+                    {
+                      "type": "scalar",
+                      "value": "name"
+                    },
+                    {
+                      "type": "scalar",
+                      "value": "query_evidence"
+                    }
+                  ],
+                  [
+                    {
+                      "type": "scalar",
+                      "value": "description"
+                    },
+                    {
+                      "type": "scalar",
+                      "value": "Query original evidence by kind, table or exact field value. Returns IDs and pagination; not a conclusion about source completeness."
+                    }
+                  ],
+                  [
+                    {
+                      "type": "scalar",
+                      "value": "parameters"
+                    },
+                    {
+                      "type": "dict",
+                      "value": [
+                        [
+                          {
+                            "type": "scalar",
+                            "value": "type"
+                          },
+                          {
+                            "type": "scalar",
+                            "value": "object"
+                          }
+                        ],
+                        [
+                          {
+                            "type": "scalar",
+                            "value": "properties"
+                          },
+                          {
+                            "type": "dict",
+                            "value": [
+                              [
+                                {
+                                  "type": "scalar",
+                                  "value": "scope"
+                                },
+                                {
+                                  "type": "dict",
+                                  "value": [
+                                    [
+                                      {
+                                        "type": "scalar",
+                                        "value": "type"
+                                      },
+                                      {
+                                        "type": "scalar",
+                                        "value": "string"
+                                      }
+                                    ],
+                                    [
+                                      {
+                                        "type": "scalar",
+                                        "value": "enum"
+                                      },
+                                      {
+                                        "type": "list",
+                                        "value": [
+                                          {
+                                            "type": "scalar",
+                                            "value": "task"
+                                          },
+                                          {
+                                            "type": "scalar",
+                                            "value": "reference"
+                                          },
+                                          {
+                                            "type": "scalar",
+                                            "value": "observation"
+                                          }
+                                        ]
+                                      }
+                                    ]
+                                  ]
+                                }
+                              ],
+                              [
+                                {
+                                  "type": "scalar",
+                                  "value": "kinds"
+                                },
+                                {
+                                  "type": "dict",
+                                  "value": [
+                                    [
+                                      {
+                                        "type": "scalar",
+                                        "value": "type"
+                                      },
+                                      {
+                                        "type": "scalar",
+                                        "value": "array"
+                                      }
+                                    ],
+                                    [
+                                      {
+                                        "type": "scalar",
+                                        "value": "items"
+                                      },
+                                      {
+                                        "type": "dict",
+                                        "value": [
+                                          [
+                                            {
+                                              "type": "scalar",
+                                              "value": "type"
+                                            },
+                                            {
+                                              "type": "scalar",
+                                              "value": "string"
+                                            }
+                                          ]
+                                        ]
+                                      }
+                                    ]
+                                  ]
+                                }
+                              ],
+                              [
+                                {
+                                  "type": "scalar",
+                                  "value": "table_id"
+                                },
+                                {
+                                  "type": "dict",
+                                  "value": [
+                                    [
+                                      {
+                                        "type": "scalar",
+                                        "value": "type"
+                                      },
+                                      {
+                                        "type": "scalar",
+                                        "value": "string"
+                                      }
+                                    ]
+                                  ]
+                                }
+                              ],
+                              [
+                                {
+                                  "type": "scalar",
+                                  "value": "field"
+                                },
+                                {
+                                  "type": "dict",
+                                  "value": [
+                                    [
+                                      {
+                                        "type": "scalar",
+                                        "value": "type"
+                                      },
+                                      {
+                                        "type": "scalar",
+                                        "value": "string"
+                                      }
+                                    ]
+                                  ]
+                                }
+                              ],
+                              [
+                                {
+                                  "type": "scalar",
+                                  "value": "equals"
+                                },
+                                {
+                                  "type": "dict",
+                                  "value": [
+                                    [
+                                      {
+                                        "type": "scalar",
+                                        "value": "type"
+                                      },
+                                      {
+                                        "type": "scalar",
+                                        "value": "string"
+                                      }
+                                    ]
+                                  ]
+                                }
+                              ],
+                              [
+                                {
+                                  "type": "scalar",
+                                  "value": "contains"
+                                },
+                                {
+                                  "type": "dict",
+                                  "value": [
+                                    [
+                                      {
+                                        "type": "scalar",
+                                        "value": "type"
+                                      },
+                                      {
+                                        "type": "scalar",
+                                        "value": "string"
+                                      }
+                                    ]
+                                  ]
+                                }
+                              ],
+                              [
+                                {
+                                  "type": "scalar",
+                                  "value": "limit"
+                                },
+                                {
+                                  "type": "dict",
+                                  "value": [
+                                    [
+                                      {
+                                        "type": "scalar",
+                                        "value": "type"
+                                      },
+                                      {
+                                        "type": "scalar",
+                                        "value": "integer"
+                                      }
+                                    ],
+                                    [
+                                      {
+                                        "type": "scalar",
+                                        "value": "minimum"
+                                      },
+                                      {
+                                        "type": "scalar",
+                                        "value": 1
+                                      }
+                                    ],
+                                    [
+                                      {
+                                        "type": "scalar",
+                                        "value": "maximum"
+                                      },
+                                      {
+                                        "type": "scalar",
+                                        "value": 200
+                                      }
+                                    ]
+                                  ]
+                                }
+                              ],
+                              [
+                                {
+                                  "type": "scalar",
+                                  "value": "offset"
+                                },
+                                {
+                                  "type": "dict",
+                                  "value": [
+                                    [
+                                      {
+                                        "type": "scalar",
+                                        "value": "type"
+                                      },
+                                      {
+                                        "type": "scalar",
+                                        "value": "integer"
+                                      }
+                                    ],
+                                    [
+                                      {
+                                        "type": "scalar",
+                                        "value": "minimum"
+                                      },
+                                      {
+                                        "type": "scalar",
+                                        "value": 0
+                                      }
+                                    ]
+                                  ]
+                                }
+                              ]
+                            ]
+                          }
+                        ],
+                        [
+                          {
+                            "type": "scalar",
+                            "value": "additionalProperties"
+                          },
+                          {
+                            "type": "scalar",
+                            "value": false
+                          }
+                        ]
+                      ]
+                    }
+                  ]
+                ]
+              }
+            ]
+          ]
+        },
+        {
+          "type": "dict",
+          "value": [
+            [
+              {
+                "type": "scalar",
+                "value": "type"
+              },
+              {
+                "type": "scalar",
+                "value": "function"
+              }
+            ],
+            [
+              {
+                "type": "scalar",
+                "value": "function"
+              },
+              {
+                "type": "dict",
+                "value": [
+                  [
+                    {
+                      "type": "scalar",
+                      "value": "name"
+                    },
+                    {
+                      "type": "scalar",
+                      "value": "read_evidence"
+                    }
+                  ],
+                  [
+                    {
+                      "type": "scalar",
+                      "value": "description"
+                    },
+                    {
+                      "type": "scalar",
+                      "value": "Read exact evidence IDs or business record IDs. Follow nested evidence_ref pointers. For read_budget_exceeded, use next_read_arguments: offset pages the JSON text of one exact record. Concatenate pages in offset order; next_offset=null ends paging. Missing/omitted content is not negative evidence."
+                    }
+                  ],
+                  [
+                    {
+                      "type": "scalar",
+                      "value": "parameters"
+                    },
+                    {
+                      "type": "dict",
+                      "value": [
+                        [
+                          {
+                            "type": "scalar",
+                            "value": "type"
+                          },
+                          {
+                            "type": "scalar",
+                            "value": "object"
+                          }
+                        ],
+                        [
+                          {
+                            "type": "scalar",
+                            "value": "properties"
+                          },
+                          {
+                            "type": "dict",
+                            "value": [
+                              [
+                                {
+                                  "type": "scalar",
+                                  "value": "ids"
+                                },
+                                {
+                                  "type": "dict",
+                                  "value": [
+                                    [
+                                      {
+                                        "type": "scalar",
+                                        "value": "type"
+                                      },
+                                      {
+                                        "type": "scalar",
+                                        "value": "array"
+                                      }
+                                    ],
+                                    [
+                                      {
+                                        "type": "scalar",
+                                        "value": "items"
+                                      },
+                                      {
+                                        "type": "dict",
+                                        "value": [
+                                          [
+                                            {
+                                              "type": "scalar",
+                                              "value": "type"
+                                            },
+                                            {
+                                              "type": "scalar",
+                                              "value": "string"
+                                            }
+                                          ]
+                                        ]
+                                      }
+                                    ],
+                                    [
+                                      {
+                                        "type": "scalar",
+                                        "value": "minItems"
+                                      },
+                                      {
+                                        "type": "scalar",
+                                        "value": 1
+                                      }
+                                    ],
+                                    [
+                                      {
+                                        "type": "scalar",
+                                        "value": "maxItems"
+                                      },
+                                      {
+                                        "type": "scalar",
+                                        "value": 200
+                                      }
+                                    ]
+                                  ]
+                                }
+                              ],
+                              [
+                                {
+                                  "type": "scalar",
+                                  "value": "offset"
+                                },
+                                {
+                                  "type": "dict",
+                                  "value": [
+                                    [
+                                      {
+                                        "type": "scalar",
+                                        "value": "type"
+                                      },
+                                      {
+                                        "type": "scalar",
+                                        "value": "integer"
+                                      }
+                                    ],
+                                    [
+                                      {
+                                        "type": "scalar",
+                                        "value": "minimum"
+                                      },
+                                      {
+                                        "type": "scalar",
+                                        "value": 0
+                                      }
+                                    ]
+                                  ]
+                                }
+                              ],
+                              [
+                                {
+                                  "type": "scalar",
+                                  "value": "max_chars"
+                                },
+                                {
+                                  "type": "dict",
+                                  "value": [
+                                    [
+                                      {
+                                        "type": "scalar",
+                                        "value": "type"
+                                      },
+                                      {
+                                        "type": "scalar",
+                                        "value": "integer"
+                                      }
+                                    ],
+                                    [
+                                      {
+                                        "type": "scalar",
+                                        "value": "minimum"
+                                      },
+                                      {
+                                        "type": "scalar",
+                                        "value": 100
+                                      }
+                                    ],
+                                    [
+                                      {
+                                        "type": "scalar",
+                                        "value": "maximum"
+                                      },
+                                      {
+                                        "type": "scalar",
+                                        "value": 40000
+                                      }
+                                    ]
+                                  ]
+                                }
+                              ]
+                            ]
+                          }
+                        ],
+                        [
+                          {
+                            "type": "scalar",
+                            "value": "required"
+                          },
+                          {
+                            "type": "list",
+                            "value": [
+                              {
+                                "type": "scalar",
+                                "value": "ids"
+                              }
+                            ]
+                          }
+                        ],
+                        [
+                          {
+                            "type": "scalar",
+                            "value": "additionalProperties"
+                          },
+                          {
+                            "type": "scalar",
+                            "value": false
+                          }
+                        ]
+                      ]
+                    }
+                  ]
+                ]
+              }
+            ]
+          ]
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,346 @@
+{
+  "schema": "aims-literals/1",
+  "values": {
+    "GATES": {
+      "type": "dict",
+      "value": [
+        [
+          {
+            "type": "scalar",
+            "value": "AC-1"
+          },
+          {
+            "type": "scalar",
+            "value": null
+          }
+        ],
+        [
+          {
+            "type": "scalar",
+            "value": "AC-2"
+          },
+          {
+            "type": "scalar",
+            "value": null
+          }
+        ],
+        [
+          {
+            "type": "scalar",
+            "value": "AC-3"
+          },
+          {
+            "type": "scalar",
+            "value": null
+          }
+        ],
+        [
+          {
+            "type": "scalar",
+            "value": "TC-1"
+          },
+          {
+            "type": "scalar",
+            "value": null
+          }
+        ],
+        [
+          {
+            "type": "scalar",
+            "value": "EE-4"
+          },
+          {
+            "type": "scalar",
+            "value": null
+          }
+        ],
+        [
+          {
+            "type": "scalar",
+            "value": "EG-1"
+          },
+          {
+            "type": "scalar",
+            "value": null
+          }
+        ],
+        [
+          {
+            "type": "scalar",
+            "value": "EG-2"
+          },
+          {
+            "type": "scalar",
+            "value": null
+          }
+        ],
+        [
+          {
+            "type": "scalar",
+            "value": "EG-3"
+          },
+          {
+            "type": "scalar",
+            "value": null
+          }
+        ],
+        [
+          {
+            "type": "scalar",
+            "value": "TU-1"
+          },
+          {
+            "type": "scalar",
+            "value": "tool_use"
+          }
+        ],
+        [
+          {
+            "type": "scalar",
+            "value": "TU-2"
+          },
+          {
+            "type": "scalar",
+            "value": "tool_use"
+          }
+        ],
+        [
+          {
+            "type": "scalar",
+            "value": "TU-3"
+          },
+          {
+            "type": "scalar",
+            "value": "tool_use"
+          }
+        ],
+        [
+          {
+            "type": "scalar",
+            "value": "PE-1"
+          },
+          {
+            "type": "scalar",
+            "value": "planning"
+          }
+        ],
+        [
+          {
+            "type": "scalar",
+            "value": "PE-2"
+          },
+          {
+            "type": "scalar",
+            "value": "planning"
+          }
+        ],
+        [
+          {
+            "type": "scalar",
+            "value": "PE-3"
+          },
+          {
+            "type": "scalar",
+            "value": "planning"
+          }
+        ],
+        [
+          {
+            "type": "scalar",
+            "value": "ER-1"
+          },
+          {
+            "type": "scalar",
+            "value": "error_recovery"
+          }
+        ],
+        [
+          {
+            "type": "scalar",
+            "value": "ER-2"
+          },
+          {
+            "type": "scalar",
+            "value": "error_recovery"
+          }
+        ],
+        [
+          {
+            "type": "scalar",
+            "value": "ER-3"
+          },
+          {
+            "type": "scalar",
+            "value": "error_recovery"
+          }
+        ],
+        [
+          {
+            "type": "scalar",
+            "value": "HC-1"
+          },
+          {
+            "type": "scalar",
+            "value": "human_approval"
+          }
+        ],
+        [
+          {
+            "type": "scalar",
+            "value": "HC-3"
+          },
+          {
+            "type": "scalar",
+            "value": "human_approval"
+          }
+        ],
+        [
+          {
+            "type": "scalar",
+            "value": "HC-4"
+          },
+          {
+            "type": "scalar",
+            "value": "human_approval"
+          }
+        ],
+        [
+          {
+            "type": "scalar",
+            "value": "HC-2"
+          },
+          {
+            "type": "scalar",
+            "value": null
+          }
+        ],
+        [
+          {
+            "type": "scalar",
+            "value": "BC-1"
+          },
+          {
+            "type": "scalar",
+            "value": "budget"
+          }
+        ]
+      ]
+    },
+    "EVIDENCE_OF": {
+      "type": "dict",
+      "value": [
+        [
+          {
+            "type": "scalar",
+            "value": "tool_use"
+          },
+          {
+            "type": "tuple",
+            "value": [
+              {
+                "type": "scalar",
+                "value": "TU-1"
+              },
+              {
+                "type": "scalar",
+                "value": "TU-2"
+              },
+              {
+                "type": "scalar",
+                "value": "TU-3"
+              }
+            ]
+          }
+        ],
+        [
+          {
+            "type": "scalar",
+            "value": "planning"
+          },
+          {
+            "type": "tuple",
+            "value": [
+              {
+                "type": "scalar",
+                "value": "PE-1"
+              },
+              {
+                "type": "scalar",
+                "value": "PE-2"
+              },
+              {
+                "type": "scalar",
+                "value": "PE-3"
+              }
+            ]
+          }
+        ],
+        [
+          {
+            "type": "scalar",
+            "value": "error_recovery"
+          },
+          {
+            "type": "tuple",
+            "value": [
+              {
+                "type": "scalar",
+                "value": "ER-1"
+              },
+              {
+                "type": "scalar",
+                "value": "ER-2"
+              },
+              {
+                "type": "scalar",
+                "value": "ER-3"
+              }
+            ]
+          }
+        ],
+        [
+          {
+            "type": "scalar",
+            "value": "human_approval"
+          },
+          {
+            "type": "tuple",
+            "value": [
+              {
+                "type": "scalar",
+                "value": "HC-1"
+              },
+              {
+                "type": "scalar",
+                "value": "HC-2"
+              },
+              {
+                "type": "scalar",
+                "value": "HC-3"
+              },
+              {
+                "type": "scalar",
+                "value": "HC-4"
+              }
+            ]
+          }
+        ],
+        [
+          {
+            "type": "scalar",
+            "value": "budget"
+          },
+          {
+            "type": "tuple",
+            "value": [
+              {
+                "type": "scalar",
+                "value": "BC-1"
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  }
+}

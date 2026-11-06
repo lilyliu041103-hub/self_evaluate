@@ -1,5 +1,6 @@
 """Separate preparation, indexed evidence access, and explicit scoring commands."""
 from __future__ import annotations
+from .resources import literal as _fragment
 
 import argparse
 import copy
@@ -26,7 +27,7 @@ def parser():
     prep.add_argument('--task-id')
     prep.add_argument('--bindings', help='Optional trusted JSON mapping rubric IDs to program bindings')
     prep.add_argument('--methods', help='Optional JSON mapping rubric IDs to allowed P/J/H methods, fixed before scoring')
-    inst = subs.add_parser('instantiate', help='Instantiate checks from the actual run and validate locally; exports a request unless --model-roles is given')
+    inst = subs.add_parser('instantiate', help=_fragment('prompts/bridge/fragments/cli.json', 'fragment_1'))
     inst.add_argument('--bundle', required=True)
     inst.add_argument('--engine', default=str(DEFAULT_ENGINE))
     inst.add_argument('--out', required=True)
@@ -188,7 +189,7 @@ def main(argv=None):
                 if plan.get('stage') != 'template':
                     raise ValueError('--template-preview requires a static template plan.')
             elif plan.get('schema_version') != 'agentos-rubric-plan/4' or plan.get('stage') != 'frozen':
-                raise ValueError('Score requires a locally validated runtime plan for this exact run. Run instantiate first and supply --plan; use --template-preview only for offline template diagnostics.')
+                raise ValueError(_fragment('prompts/bridge/fragments/cli.json', 'fragment_2'))
             checks, selection = bind_observation(plan, store, args.engine)
             original = json.loads((Path(args.bundle) / 'audit/original-input.json').read_text(encoding='utf-8'))
             sys.path.insert(0, str(Path(args.engine).resolve()))
@@ -254,9 +255,7 @@ def main(argv=None):
                     write_json(output / 'evidence-packs' / (pack['pack_id'] + '.json'), {
                         'schema_version': 'score-evidence-pack/1', 'pack_id': pack['pack_id'],
                         'evidence': {eid: store.records[eid] for eid in pack['evidence_ids']}})
-                manifest['cache_semantics'] = ('Local immutable evidence files, not provider cache handles. '
-                    'Provider reuse requires the identical preceding context and pack order; '
-                    'pack_prefixes records cumulative request prefixes.')
+                manifest['cache_semantics'] = (_fragment('prompts/bridge/fragments/cli.json', 'fragment_3'))
                 write_json(output / 'evidence-packs' / 'manifest.json', manifest)
             write_json(output / 'run-binding.json', {'plan_hash': plan['plan_hash'],
                                                      'bundle': str(Path(args.bundle).resolve()),

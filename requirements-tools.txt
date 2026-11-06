@@ -1,0 +1,3 @@
+# Optional tools: installation requires user approval.
+pydantic==2.13.4
+requests==2.34.2

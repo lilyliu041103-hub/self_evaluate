@@ -1,0 +1,13 @@
+{
+  "schema": "aims-literals/1",
+  "values": {
+    "fragment_1": {
+      "type": "scalar",
+      "value": "This source snapshot is a declared reference, not proof of the tool version, deployment, or permission in the observed execution. Keep its historical_version_match visible."
+    },
+    "fragment_2": {
+      "type": "scalar",
+      "value": "OOXML scalar strings; per-row types distinguish numbers, strings, booleans and errors; no formula recalculation."
+    }
+  }
+}

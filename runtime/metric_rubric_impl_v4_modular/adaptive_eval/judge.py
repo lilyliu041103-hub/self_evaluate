@@ -4,6 +4,7 @@ No network requests are performed. The caller submits ``system`` and ``user``
 to its selected model and passes the returned JSON to ``validate_response``.
 """
 from __future__ import annotations
+from .resources import resource as _resource, resource_files as _resource_files, PROJECT as _PROJECT
 
 import json
 from pathlib import Path
@@ -106,8 +107,8 @@ def build_request(case: dict, spec: dict) -> dict:
                                set(anchors) != {"yes", "no"} or
                                any(not isinstance(v, str) or not v.strip() for v in anchors.values())):
         raise ValueError("anchors must define non-empty text for yes and no only")
-    system = (ROOT / "legacy" / "prompts" / "system.txt").read_text(encoding="utf-8")
-    specific = (ROOT / rubric["prompt_file"]).read_text(encoding="utf-8")
+    system = (_resource('legacy/prompts/system.txt')).read_text(encoding="utf-8")
+    specific = (_resource(rubric["prompt_file"])).read_text(encoding="utf-8")
     payload = {"check_id": spec["id"], "rubric_id": rubric["id"],
                "criterion": criterion, "task_specific_anchors": anchors,
                "allowed_input_paths": paths, "inputs": inputs}

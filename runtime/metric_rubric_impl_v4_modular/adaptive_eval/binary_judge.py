@@ -4,6 +4,7 @@ The model receives the same four-key payload used by every program evaluator:
 task, observation, reference, check. Data is projected to explicit input_paths.
 """
 from __future__ import annotations
+from .resources import resource as _resource, resource_files as _resource_files, PROJECT as _PROJECT
 
 import copy
 import json
@@ -122,7 +123,7 @@ def build_request(payload):
         raise ValueError("Judge check must identify its rubric and parent metric")
     if check["method"] not in rubric["allowed_methods"] or not rubric["judge_rules"]:
         raise ValueError("The rubric does not support this Judge method")
-    system = (ROOT / "prompts" / "scoring" / "system.txt").read_text(encoding="utf-8")
+    system = (_resource('prompts/scoring/system.txt')).read_text(encoding="utf-8")
     specific = rubric["judge_rules"]
     return {"stage": "evaluate", "check_id": check["id"],
             "system": system + "\n\n" + specific,

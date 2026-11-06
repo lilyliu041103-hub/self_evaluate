@@ -1,0 +1,25 @@
+{
+  "schema": "aims-literals/1",
+  "values": {
+    "fragment_1": {
+      "type": "scalar",
+      "value": "No task-specific model-generated rubric or gold. Fixed rubric boundaries and methods are retained; missing program bindings remain unverifiable."
+    },
+    "fragment_2": {
+      "type": "scalar",
+      "value": "Initial view only. All omitted rows remain queryable; unviewed data cannot establish absence or completeness."
+    },
+    "fragment_3": {
+      "type": "scalar",
+      "value": "Source-snapshot checks assess the named reference version. They do not establish the deployed historical version or execution authorization."
+    },
+    "fragment_4": {
+      "type": "scalar",
+      "value": "Only explicitly bound records, their schemas/span headers, task request and run status. Follow references or query supplemental evidence; a bounded packet cannot prove absence."
+    },
+    "fragment_5": {
+      "type": "scalar",
+      "value": "All event headers; output/error payload views. Inputs, metadata and large fields remain retrievable by evidence_ref or query. This initial packet is not the full trace."
+    }
+  }
+}

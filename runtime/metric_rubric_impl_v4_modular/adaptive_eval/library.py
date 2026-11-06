@@ -5,6 +5,7 @@ consulted, so edits are visible on the next load and can be fingerprinted by
 the plan contract. YAML uses a safe loader and rejects duplicate mapping keys.
 """
 from __future__ import annotations
+from .resources import resource as _resource, resource_files as _resource_files, PROJECT as _PROJECT
 
 from pathlib import Path
 import re
@@ -85,7 +86,7 @@ def load_library(root=None):
     files; absent files, extra files and inconsistent ownership are rejected.
     """
     package = Path(root) if root is not None else ROOT
-    index = _read(package / "configs" / "metrics.yaml")
+    index = _read(_resource('configs/metrics.yaml', package))
     _keys(index, {"version", "aggregation_policy", "metrics"}, "metrics index")
     _text(index["version"], "library version")
     if not isinstance(index["aggregation_policy"], dict):
@@ -114,7 +115,7 @@ def load_library(root=None):
             if rid in declarations:
                 raise LibraryError("Rubric declared more than once: " + rid)
             declarations[rid] = mid
-    rubric_dir = package / "configs" / "rubrics"
+    rubric_dir = _resource('configs/rubrics', package)
     files = sorted(rubric_dir.glob("*.yaml"))
     if {path.stem for path in files} != set(declarations):
         missing = sorted(set(declarations) - {path.stem for path in files})

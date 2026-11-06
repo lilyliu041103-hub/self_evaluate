@@ -1,5 +1,6 @@
 """Config-driven runner. No model API is called unless a caller supplies judge_fn."""
 from __future__ import annotations
+from .resources import resource as _resource, resource_files as _resource_files, PROJECT as _PROJECT
 
 import copy
 import hashlib
@@ -25,7 +26,7 @@ def catalog():
                         # protocol template. New v4 Judge capabilities must not
                         # advertise nonexistent legacy files.
                         "prompt_file": f"legacy/prompts/{r['id']}.txt"
-                        if r["judge_rules"] and (ROOT / "legacy" / "prompts" / (r["id"] + ".txt")).is_file()
+                        if r["judge_rules"] and (_resource('legacy/prompts') / (r["id"] + ".txt")).is_file()
                         else None}
                        for r in data["rubrics"]]
     return data
@@ -33,13 +34,13 @@ def catalog():
 
 def implementation_fingerprint():
     paths = sorted((ROOT / "adaptive_eval").glob("*.py"))
-    paths += sorted((ROOT / "configs").rglob("*.yaml"))
+    paths += _resource_files()
     paths += sorted((ROOT / "configs").glob("*.schema.json"))
-    paths += sorted((ROOT / "prompts").rglob("*.txt"))
-    paths += sorted((ROOT / "legacy" / "prompts").glob("*.txt"))
+    paths += sorted((_resource('prompts')).rglob("*.txt"))
+    paths += sorted((_resource('legacy/prompts')).glob("*.txt"))
     digest = hashlib.sha256()
     for path in paths:
-        digest.update(path.relative_to(ROOT).as_posix().encode("utf-8"))
+        digest.update(str(path.resolve().relative_to(_PROJECT)).encode("utf-8"))
         digest.update(path.read_bytes())
     return digest.hexdigest()
 

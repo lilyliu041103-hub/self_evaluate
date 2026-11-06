@@ -5,6 +5,7 @@ also retains formal actions without execution, invalid parameters and conflicts.
 Every inventory object points back to its original trace payloads.
 """
 from __future__ import annotations
+from .resources import literal as _fragment
 
 import copy
 import json
@@ -168,8 +169,7 @@ def _contract_inputs(value, pointer, event_index):
                 names = name_schema.get('enum', []) if isinstance(name_schema, dict) else []
                 if not isinstance(names, list) or len(names) != 1 or not isinstance(names[0], str):
                     continue
-                source = (f'{pointer}/response_format/json_schema/schema/properties/action/anyOf/{ai}'
-                          f'/properties/tool_calls/items/anyOf/{bi}')
+                source = (_fragment('prompts/bridge/fragments/tool_observations.json', 'fragment_1').format(v0=(pointer), v1=(ai), v2=(bi)))
                 found.append({'name': names[0], 'description': name_schema.get('description', ''),
                     'contract_level': 'capability', 'wire_call_schema': copy.deepcopy(branch),
                     'provenance': {'source_event_index': event_index, 'source_pointer': source,
@@ -278,7 +278,7 @@ def normalize_tool_observations(original):
                 'message_index': ci, 'result_message_index': mi, 'execution_evidence': 'linked_tool_result',
                 'result_status': result.get('status'),
                 'invocation_event_index': None,
-                'temporal_note': 'Call/result order is recorded in this input history; request time is an upper bound, not execution time.'})
+                'temporal_note': _fragment('prompts/bridge/fragments/tool_observations.json', 'fragment_2')})
         for cid in invalid_ids:
             calls[cid] = None
 
@@ -326,7 +326,7 @@ def normalize_tool_observations(original):
     observation['tool_contracts'] = contracts
     observation['tool_normalization'] = {'version': 'agentos-tool-observations/1',
         'call_count': len(observation['tool_calls']), 'contract_count': len(contracts), 'rejected': rejected,
-        'note': 'Derived only from original event payloads. Source snapshot contracts do not prove historical deployment or permission.'}
+        'note': _fragment('prompts/bridge/fragments/tool_observations.json', 'fragment_3')}
     from .tool_attempts import build_tool_attempts
     observation['tool_attempts'] = build_tool_attempts(observation)
     observation['tool_normalization']['attempt_count'] = len(observation['tool_attempts'])

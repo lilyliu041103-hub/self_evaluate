@@ -1,0 +1,6 @@
+# Optional patterns: review and copy to .gitignore only when approved.
+# metrics/
+# rubrics/
+# prompts/
+# benchmarks/
+# Existing tracked files remain tracked until explicitly removed from the index.
