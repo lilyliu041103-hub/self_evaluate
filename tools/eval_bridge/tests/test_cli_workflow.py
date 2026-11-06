@@ -127,14 +127,16 @@ class WorkflowTests(unittest.TestCase):
         responses = candidate(self.base) if generated is None else generated
         captured = []
         class SyntheticClient:
-            def __init__(self, config, store, log_dir, rounds, *, role):
+            def __init__(self, config, store, log_dir, rounds, *, role, response_cache=True):
                 if role not in ('instantiate', 'score'):
                     raise AssertionError('No review model may be created')
                 self.config, self.role, self.calls = config, role, 0
+                self.response_cache = response_cache
 
             def statistics(self):
                 return {'role': self.role, 'model': self.config['model'],
-                        'base_url': self.config['base_url'], 'api_calls': self.calls}
+                        'base_url': self.config['base_url'], 'api_calls': self.calls,
+                        'response_cache_enabled': self.response_cache}
 
             def __call__(self, request):
                 self.calls += 1
@@ -142,7 +144,8 @@ class WorkflowTests(unittest.TestCase):
                 if self.role == 'instantiate':
                     return copy.deepcopy(responses)
                 payload = json.loads(request['user'])
-                return {'results': [{'check_id': c['check_id'], 'status': 'scored', 'verdict': True}
+                return {'results': [{'check_id': c['check_id'], 'status': 'scored', 'verdict': True,
+                                     'reason': 'run:final_answer 中的交付内容满足该检查要求。'}
                                     for c in payload['checks']]}
         return SyntheticClient, captured
 
@@ -170,7 +173,12 @@ class WorkflowTests(unittest.TestCase):
         self.assertFalse(list((self.root / 'instantiated').glob('review*')))
         report = json.loads((self.root / 'scored/report.json').read_text(encoding='utf-8'))
         self.assertTrue(report['rubrics']['TC-1']['verdict'])
-        self.assertEqual(len(report['rubrics']), 21)
+        self.assertEqual(report['checks']['TC-1.batch-result']['reason'],
+                         'run:final_answer 中的交付内容满足该检查要求。')
+        self.assertEqual(report['rubrics']['TC-1']['check_ids'], ['TC-1.batch-result'])
+        self.assertEqual(report['rubrics']['TC-1']['failed_check_ids'], [])
+        self.assertEqual(report['metrics']['TC']['failed_rubric_ids'], [])
+        self.assertEqual(len(report['rubrics']), 22)
         self.assertEqual(report['rubrics']['AC-3']['status'], 'unverifiable')
         self.assertEqual(report['execution']['client']['model'], 'score-model')
         status = json.loads((self.root / 'instantiated/status.json').read_text(encoding='utf-8'))
@@ -207,7 +215,7 @@ class WorkflowTests(unittest.TestCase):
         status = json.loads((self.root / 'rejected/status.json').read_text(encoding='utf-8'))
         self.assertEqual(status['stage'], 'not_frozen')
         self.assertEqual(status['phase'], 'local_validation')
-        self.assertRegex(status['validation_error'], '21|missing')
+        self.assertRegex(status['validation_error'], '22|missing')
 
     def test_transport_error_records_phase_without_exception_text(self):
         base_client, _ = self.model_factory()
@@ -270,6 +278,73 @@ class WorkflowTests(unittest.TestCase):
         self.assertFalse(report['rubrics']['TU-2']['verdict'])
         self.assertEqual(report['execution']['program_call_count'], 2)
         self.assertEqual(report['execution']['judge_call_count'], 0)
+
+    def test_same_frozen_plan_exports_baseline_and_isolated_requests(self):
+        from eval_bridge.instantiation import freeze_plan
+        generated = candidate(self.base)
+        tc_check = next(r for r in generated['rubrics'] if r['rubric_id'] == 'TC-1')['checks'][0]
+        ac_check = copy.deepcopy(tc_check)
+        ac_check.update(id='AC-1.batch-fact', criterion='The delivered batch identifier is B-TEST-17.',
+                        prompt='Verify the delivered batch identifier against the task request.')
+        next(r for r in generated['rubrics'] if r['rubric_id'] == 'AC-1').update(
+            checks=[ac_check], unresolved=[])
+        frozen = freeze_plan(self.base, EvidenceStore(self.bundle), generated)
+        path = self.root / 'frozen.json'
+        write_json(path, frozen)
+        for layout in ('none', 'shared', 'packs'):
+            exports = {}
+            for mode in ('baseline', 'metric'):
+                out = mode + '-' + layout
+                self.assertEqual(self.cli('score', out, '--plan', path, '--scoring-mode', mode,
+                                         '--common-evidence-mode', layout), 0)
+                exports[mode] = json.loads((self.root / out / 'requests.json').read_text(encoding='utf-8'))
+                report = json.loads((self.root / out / 'report.json').read_text(encoding='utf-8'))
+                self.assertEqual(report['plan_hash'], frozen['plan_hash'])
+                self.assertEqual(report['execution']['judge_call_count'], 0)
+                for request in exports[mode]:
+                    self.assertLessEqual(request['request_chars'], 64000)
+                    self.assertGreater(request['input_request_chars'], len(request['system']) + len(request['user']))
+                if layout == 'packs':
+                    from eval_bridge.evidence import digest
+                    directory = self.root / out / 'evidence-packs'
+                    manifest = json.loads((directory / 'manifest.json').read_text(encoding='utf-8'))
+                    self.assertEqual(manifest['schema_version'], 'score-evidence-packs/1')
+                    self.assertEqual(len(list(directory.glob('*.json'))), len(manifest['packs']) + 1)
+                    stored = {}
+                    for pack in manifest['packs']:
+                        content = json.loads((directory / (pack['pack_id'] + '.json')).read_text(encoding='utf-8'))
+                        self.assertEqual(content.pop('pack_id'), pack['pack_id'])
+                        self.assertEqual(digest(content), pack['pack_id'])
+                        stored[pack['pack_id']] = content['evidence']
+                    for request in exports[mode]:
+                        records = {eid: record for pid in request['evidence_pack_ids']
+                                   for eid, record in stored[pid].items()}
+                        self.assertEqual(records, json.loads(request['user'])['evidence'])
+            self.assertEqual(len(exports['baseline']), 1)
+            self.assertEqual(len(exports['metric']), 2)
+            self.assertTrue(all(len(r['metric_ids']) == 1 for r in exports['metric']))
+            if layout in ('shared', 'packs'):
+                all_requests = exports['baseline'] + exports['metric']
+                self.assertEqual(len({r['common_prefix_hash'] for r in all_requests}), 1)
+                self.assertEqual(len({r['user'][:r['common_prefix_chars']] for r in all_requests}), 1)
+
+    def test_live_score_can_disable_local_response_cache(self):
+        client, _ = self.model_factory()
+        with patch('eval_bridge.client.ModelClient', client):
+            self.cli('instantiate', 'instantiated', '--model-roles', self.roles)
+            self.cli('score', 'uncached', '--plan', self.root / 'instantiated/plan.json',
+                     '--model-roles', self.roles, '--no-response-cache')
+        report = json.loads((self.root / 'uncached/report.json').read_text(encoding='utf-8'))
+        self.assertFalse(report['execution']['client']['response_cache_enabled'])
+        self.assertFalse(report['execution']['response_cache_enabled'])
+        self.assertEqual(report['execution']['common_evidence_mode'], 'packs')
+        self.assertTrue((self.root / 'uncached/evidence-packs/manifest.json').is_file())
+
+    def test_zero_retrieval_reserve_requires_tools_disabled(self):
+        with self.assertRaises(SystemExit):
+            self.cli('score', 'invalid-budget', '--template-preview', '--tool-reserve-chars', 0)
+        self.assertEqual(self.cli('score', 'no-tools', '--template-preview',
+                                 '--tool-reserve-chars', 0, '--max-tool-rounds', 0), 0)
 
 
 if __name__ == '__main__':

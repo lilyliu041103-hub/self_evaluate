@@ -1,6 +1,6 @@
 """Task-specific rubric instantiation and uniform binary metric evaluation."""
 
-__version__ = "4.1.0"
+__version__ = "4.2.0"
 
 from .instantiation import instantiate
 from .unified import evaluate_metrics

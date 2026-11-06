@@ -11,11 +11,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from eval_bridge.evidence import EvidenceStore, build_evidence, canonical, digest, make_index, write_json
 from eval_bridge.instantiation import (
     build_instantiation_request, freeze_plan, instantiate_plan, validate_candidate, verify_instantiated,
-    _run_inventory,
+    _run_inventory, SourceQuoteError, _candidate_diagnostics,
 )
 
 
-RUBRICS = 'AC-1 AC-2 AC-3 BC-1 EE-4 EG-1 EG-2 ER-1 ER-2 ER-3 HC-1 HC-2 HC-3 HC-4 PE-1 PE-2 PE-3 TC-1 TU-1 TU-2 TU-3'.split()
+RUBRICS = 'AC-1 AC-2 AC-3 BC-1 EE-4 EG-1 EG-2 EG-3 ER-1 ER-2 ER-3 HC-1 HC-2 HC-3 HC-4 PE-1 PE-2 PE-3 TC-1 TU-1 TU-2 TU-3'.split()
 TOOL_SCHEMA = {'type': 'object', 'properties': {'batch': {'type': 'string'}}, 'required': ['batch'],
                'additionalProperties': False}
 
@@ -132,6 +132,41 @@ class InstantiationTests(unittest.TestCase):
     def tearDown(self):
         self.tmp.cleanup()
 
+    def test_quote_feedback_identifies_missing_chinese_quotes_without_accepting_them(self):
+        self.original['task']['request'] = '“初报”是待复核记录，不能作为当前事实。'
+        self.rebuild()
+        proposed = candidate()
+        check = entry(proposed)['checks'][0]
+        check['source_refs'] = [{'evidence_id': 'task:request', 'quote': '初报是待复核记录，不能作为当前事实。'}]
+        original = copy.deepcopy(proposed)
+        with self.assertRaises(SourceQuoteError) as error:
+            validate_candidate(self.plan, self.store, proposed)
+        detail = error.exception.diagnostic
+        self.assertEqual(detail['check_id'], check['id'])
+        self.assertEqual(detail['rubric_id'], 'TC-1')
+        self.assertEqual(detail['source_ref_index'], 0)
+        self.assertEqual(detail['source_excerpt'], self.original['task']['request'])
+        self.assertEqual([edit['source'] for edit in detail['character_edits']], ['“', '”'])
+        self.assertEqual(proposed, original)
+        diagnostics = _candidate_diagnostics(self.plan, self.store, proposed)
+        self.assertEqual(diagnostics[0]['source_quote'], detail)
+        check['source_refs'][0]['quote'] = self.original['task']['request']
+        validate_candidate(self.plan, self.store, proposed)
+
+    def test_unrelated_quote_has_no_suggested_replacement(self):
+        error = SourceQuoteError('TC-1', 'c1', 0, 'task:request', 'invented rule', '完全无关的中文原文。')
+        self.assertIsNone(error.diagnostic['source_excerpt'])
+        self.assertEqual(error.diagnostic['character_edits'], [])
+
+    def test_numeric_difference_is_diagnosed_but_still_rejected(self):
+        self.original['task']['request'] = '不良产品24件。'
+        self.rebuild()
+        proposed = candidate()
+        entry(proposed)['checks'][0]['source_refs'] = [{'evidence_id': 'task:request', 'quote': '不良产品32件。'}]
+        with self.assertRaises(SourceQuoteError) as error:
+            validate_candidate(self.plan, self.store, proposed)
+        self.assertEqual(error.exception.diagnostic['source_excerpt'], '不良产品24件。')
+
     def test_context_contains_real_observations_inputs_schema_and_source_pointers(self):
         request = build_instantiation_request(self.plan, self.store)
         self.assertEqual(set(request), {'stage', 'system', 'user'})
@@ -144,7 +179,7 @@ class InstantiationTests(unittest.TestCase):
         self.assertIn('span:s-model:tool:0', observed)
         self.assertEqual(observed['span:s-tool:input']['data']['arguments'], {'batch': 'B-TEST-17'})
         self.assertEqual(observed['span:s-tool:input']['origin']['pointer'], '/observation/events/1/payloads/input/value')
-        self.assertEqual(len(body['profiles']), 21)
+        self.assertEqual(len(body['profiles']), 22)
 
     def test_context_is_bounded_and_reports_preview_and_omission(self):
         self.original['observation']['final_answer'] = 'x' * 90000

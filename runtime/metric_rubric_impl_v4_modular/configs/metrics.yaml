@@ -1,4 +1,4 @@
-version: 4.1.0
+version: 4.2.0
 aggregation_policy:
   metric_default: all
   rubric_default: all
@@ -55,7 +55,8 @@ metrics:
   rubrics:
   - EG-1
   - EG-2
-  description: EG-1联合检查事前证据可用、可定位且支持行动；EG-2检查来源、版本和时效。
+  - EG-3
+  description: EG-1联合检查事前证据可用、可定位且支持行动；EG-2检查来源、版本和时效；EG-3按任务目标检查截至适用截止点实际取得的必要输入是否完整。
 - id: ER
   name: Error Handling & Execution Robustness
   name_zh: 错误处理与执行稳健性

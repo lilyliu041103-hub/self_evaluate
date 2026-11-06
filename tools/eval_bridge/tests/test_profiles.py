@@ -20,9 +20,9 @@ SPEC.loader.exec_module(profiles)
 
 
 class ProfileContracts(unittest.TestCase):
-    def test_all_21_original_templates_are_preserved(self):
+    def test_all_22_configured_templates_are_preserved(self):
         loaded = profiles.load_profiles(ENGINE)
-        self.assertEqual(len(loaded), 21)
+        self.assertEqual(len(loaded), 22)
         self.assertEqual({p["id"] for p in loaded}, {p.stem for p in (ENGINE / "configs/rubrics").glob("*.yaml")})
         for profile in loaded:
             source = ENGINE / profile["source_path"]
@@ -37,12 +37,12 @@ class ProfileContracts(unittest.TestCase):
         loaded = {p["id"]: p for p in profiles.load_profiles(ENGINE)}
         for rid in ("AC-3", "BC-1"):
             self.assertEqual(loaded[rid]["how"]["allowed_methods"], ["P"])
-        for rid in ("AC-1", "AC-2", "TU-1", "PE-1", "EG-1"):
+        for rid in ("AC-1", "AC-2", "TU-1", "PE-1", "EG-1", "EG-3"):
             self.assertEqual(loaded[rid]["how"]["allowed_methods"], ["J"])
 
     def test_missing_answer_does_not_disable_process_evidence_contracts(self):
         loaded = {p["id"]: p for p in profiles.load_profiles(ENGINE)}
-        for rid in ("TU-1", "TU-2", "TU-3", "PE-2", "PE-3", "EG-1", "ER-1", "ER-2", "ER-3", "EE-4", "HC-1", "HC-2", "HC-3", "HC-4", "BC-1"):
+        for rid in ("TU-1", "TU-2", "TU-3", "PE-2", "PE-3", "EG-1", "EG-3", "ER-1", "ER-2", "ER-3", "EE-4", "HC-1", "HC-2", "HC-3", "HC-4", "BC-1"):
             self.assertNotIn(["final_answer"], loaded[rid]["required_evidence"])
         self.assertEqual(loaded["TU-1"]["required_evidence"][1], ["tool_contract"])
 
@@ -72,7 +72,7 @@ class ProfileContracts(unittest.TestCase):
 
     def test_all_rubrics_have_distinct_nonempty_coverage_guides(self):
         loaded = profiles.load_profiles(ENGINE)
-        self.assertEqual(len({p['instantiation_coverage']['unit'] for p in loaded}), 21)
+        self.assertEqual(len({p['instantiation_coverage']['unit'] for p in loaded}), 22)
         for profile in loaded:
             guide = profile['instantiation_coverage']
             self.assertEqual(set(guide), {'unit', 'include', 'bind', 'boundary'})

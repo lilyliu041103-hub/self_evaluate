@@ -165,7 +165,7 @@ class PreparationTests(unittest.TestCase):
         store = EvidenceStore(self.root / 'b')
         verify_plan(plan_a, store, DEFAULT_ENGINE)
         checks, _ = bind_observation(plan_a, store, DEFAULT_ENGINE)
-        self.assertEqual(len(checks), 21)
+        self.assertEqual(len(checks), 22)
         self.assertTrue(next(c for c in checks if c['id'] == 'TC-1')['input_complete'])
         self.assertEqual(plan_a['preparation']['model_calls'], 0)
 

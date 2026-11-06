@@ -1,4 +1,4 @@
-"""Fixed evidence contracts for the 21 rubric templates in metric v4.1.
+"""Fixed evidence contracts for the 22 rubric templates in metric v4.2.
 
 Profiles describe where an evaluator should look; they never assert task facts,
 infer missing trace events, select a new scoring method, or supply gold answers.
@@ -90,6 +90,14 @@ _COVERAGE = {
                     "已配置的有效期或最大年龄规则及正确的观测时间"],
         "bind": "绑定采用的证据、可信政策与元数据；逐项覆盖独立来源/版本义务。",
         "boundary": "未配置的维度不新增义务；其他记录的遗漏不自动构成版本失效，状态传播归PE-3。",
+    },
+    "EG-3": {
+        "unit": "一个依赖所提供资料的任务目标及其输入获取截止点",
+        "include": ["任务明确要求但答案未完成的目标，以及已完成目标所需的信息",
+                    "原附件中的必要记录、字段、关系、单位、状态和计算依赖",
+                    "预注入内容、后续读取返回及可追溯的等效摘要或查询结果"],
+        "bind": "按目标定位任务依据、原材料内容和截止前实际取得的输入；默认检查最终交付前，只有明确的完整输入交付约束才检查更早阶段。不新增全局证据清单生成阶段。",
+        "boundary": "J-only；必要信息完整不等于全量读取。初始摘录可由后续读取补齐；原材料不足或取得记录不完整保留未知。评价整次运行的取得结果，不自动归责Agent或平台；行动支持归EG-1，版本归EG-2。",
     },
     "ER-1": {
         "unit": "每个已确认异常及其规定响应窗口",
@@ -281,6 +289,14 @@ _SPECS = {
         "where": ["task_request", "table_schema", "table_row", "document", "trace_event", "trace_payload", "final_answer", "artifact"],
         "required_evidence": [["task_request", "document", "table_row"], ["trace_event", "final_answer", "artifact", "trace_payload"]],
         "policy": "需定位实际采用的来源/版本、适用政策和观测或业务时间；读取时间不能替代证据观测时间。默认 P 仍需程序参数，允许 J 的选择须显式固定。",
+    },
+    "EG-3": {
+        "group": "evidence",
+        "where": ["task_request", "table_schema", "table_row", "document", "runtime_request",
+                  "trace_event", "trace_payload", "interaction", "final_answer", "artifact", "run_status"],
+        "required_evidence": [["task_request"], ["task_request", "table_row", "document"],
+                              ["runtime_request", "trace_payload", "interaction"]],
+        "policy": "分别绑定原材料和实际取得内容。附件名称、下载链接、空目录、截断标记、Agent自报已读或最终答案均不能单独证明取得完整或失败。已知必要信息在原材料中且完整记录证明截止未取得才判否；可用补读路径不等于已经取得，补读能力未知不抹去已证实的获取缺口。",
     },
     "ER-1": {
         "group": "recovery",

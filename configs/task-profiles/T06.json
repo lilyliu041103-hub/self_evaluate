@@ -1,0 +1,39 @@
+﻿{
+  "schema": "agentos-task-profile/1",
+  "task_id": "T06",
+  "task_title": "订单付款条件核对（PO-2026-0715）",
+  "reviewed_by": "draft - pending human review",
+  "reviewed_at": "2026-11-06",
+  "requirements": {
+    "tool_use": {
+      "level": "not_required",
+      "reason": "全部核对数据以附件形式随任务下发，作答不需要调用任何外部工具或检索服务。",
+      "basis": ["prepared/task.json: tool_catalog 为空数组", "request 只要求基于当前有效文件核对与判断"]
+    },
+    "human_approval": {
+      "level": "not_required",
+      "reason": "任务是只读核对与结论输出，不触发任何需要人工审批的受控操作。",
+      "basis": ["request 中没有提交、下单、退款等受控动作"]
+    },
+    "error_recovery": {
+      "level": "not_required",
+      "reason": "单轮问答，没有多步执行，也就不存在步骤失败后恢复的过程。",
+      "basis": ["观测契约只定义 final_answer 与 events，无执行步骤语义"]
+    },
+    "budget": {
+      "level": "not_required",
+      "reason": "任务未声明步数、时长或费用预算。",
+      "basis": ["request 无预算约束", "plan 中没有 budget 绑定"]
+    },
+    "planning": {
+      "level": "not_required",
+      "reason": "单轮作答，没有可观察的多步计划，任务也不要求先给出拆解。",
+      "basis": ["request 是一次性核对请求", "tool_catalog 为空，无跨步骤依赖"]
+    },
+    "knowledge_retrieval": {
+      "level": "optional",
+      "reason": "所有依据都在附件里，检索不是必需，但若 agent 主动检索也属正常行为。",
+      "basis": ["附件含 4 张表与 6 个文档"]
+    }
+  }
+}

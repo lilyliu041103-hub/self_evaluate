@@ -1,11 +1,14 @@
 import copy
+import hashlib
 import json
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from eval_bridge.scoring import build_groups, build_group_request, evaluate_prepared
+from eval_bridge.evidence import EvidenceStore, canonical, make_index, write_json
 
 
 def check(cid, method="J", ids=None, metric="AC"):
@@ -32,6 +35,360 @@ def verdicts(request, value=True):
 
 
 class GroupedScoringTests(unittest.TestCase):
+    def test_judge_reasons_survive_scoring_and_failure_links(self):
+        checks = [check("AC-1:pass"), check("AC-1:fail"), check("AC-1:unknown")]
+        for item in checks:
+            item["rubric_id"] = "AC-1"
+        results = [
+            {"check_id": "AC-1:pass", "status": "scored", "verdict": True,
+             "reason": "shared 中的已交付内容满足要求。"},
+            {"check_id": "AC-1:fail", "status": "scored", "verdict": False,
+             "reason": "shared 中的事实陈述与参考记录冲突。"},
+            {"check_id": "AC-1:unknown", "status": "unverifiable", "verdict": None,
+             "reason": "shared 未包含确认该字段所需的时间记录。"},
+        ]
+        before = copy.deepcopy(results)
+        requests = []
+        report = evaluate_prepared(plan(checks[:1]), checks, EVIDENCE,
+                                   lambda _: json.dumps({"results": results}), request_sink=requests)
+        for result in results:
+            self.assertEqual(report["checks"][result["check_id"]],
+                             {k: v for k, v in result.items() if k != "check_id"})
+        self.assertEqual(report["rubrics"]["AC-1"]["check_ids"], [c["id"] for c in checks])
+        self.assertEqual(report["rubrics"]["AC-1"]["failed_check_ids"], ["AC-1:fail"])
+        self.assertEqual(report["metrics"]["AC"]["failed_rubric_ids"], ["AC-1"])
+        self.assertFalse(report["metrics"]["AC"]["verdict"])
+        self.assertEqual(report["execution"]["diagnostics"], {})
+        self.assertIn("Every result must include a nonempty reason", requests[0]["system"])
+        self.assertEqual(results, before)
+
+    def test_invalid_reason_does_not_discard_valid_sibling(self):
+        checks = [check("AC-1"), check("AC-2")]
+        for reason in (None, "", "  ", 3, [], {}):
+            with self.subTest(reason=reason):
+                response = {"results": [
+                    {"check_id": "AC-1", "status": "scored", "verdict": False, "reason": reason},
+                    {"check_id": "AC-2", "status": "scored", "verdict": True,
+                     "reason": "shared supports this conclusion."},
+                ]}
+                report = evaluate_prepared(plan(checks), checks, EVIDENCE, lambda _: response)
+                self.assertEqual(report["checks"]["AC-1"]["status"], "unverifiable")
+                self.assertEqual(report["execution"]["diagnostics"]["AC-1"]["code"],
+                                 "invalid_result_reason")
+                self.assertTrue(report["checks"]["AC-2"]["verdict"])
+                self.assertEqual(report["checks"]["AC-2"]["reason"], "shared supports this conclusion.")
+
+    def test_legacy_verdict_is_preserved_and_missing_reason_is_diagnosed(self):
+        checks = [check("AC-1")]
+        report = evaluate_prepared(plan(checks), checks, EVIDENCE, lambda r: verdicts(r, False))
+        self.assertEqual(report["checks"]["AC-1"], {"status": "scored", "verdict": False})
+        self.assertEqual(report["execution"]["diagnostics"]["AC-1"]["code"], "missing_judge_reason")
+        self.assertEqual(report["rubrics"]["AC-1"]["failed_check_ids"], ["AC-1"])
+
+    def test_hybrid_retains_judge_reason_and_explains_program_uncertainty(self):
+        checks = [check("AC-1", "H")]
+        response = {"results": [{"check_id": "AC-1", "status": "scored", "verdict": True,
+                                 "reason": "shared 满足语义要求。"}]}
+        report = evaluate_prepared(plan(checks), checks, EVIDENCE, lambda _: response,
+                                   {"assert": lambda data, bindings: {"status": "unverifiable", "score": None}})
+        self.assertEqual(report["checks"]["AC-1"]["status"], "unverifiable")
+        self.assertEqual(report["checks"]["AC-1"]["reason"],
+                         "程序检查无法核验，模型检查通过。shared 满足语义要求。")
+        self.assertEqual(report["metrics"]["AC"]["failed_rubric_ids"], [])
+
+    def test_metric_mode_splits_metrics_and_preserves_legacy_evidence(self):
+        checks = [check("AC-1"), check("TC-1", metric="TC"), check("AC-2")]
+        baseline = build_groups(checks, EVIDENCE, scoring_mode="baseline")
+        isolated = build_groups(checks, EVIDENCE, scoring_mode="metric")
+        self.assertEqual(len(baseline), 1)
+        self.assertEqual([group["check_ids"] for group in isolated], [["AC-1", "AC-2"], ["TC-1"]])
+        for group in isolated:
+            request = build_group_request(group)
+            body = json.loads(request["user"])
+            self.assertEqual(len({c["metric_id"] for c in body["checks"]}), 1)
+            self.assertEqual(body["evidence"], json.loads(build_group_request(baseline[0])["user"])["evidence"])
+
+    def test_common_prefix_is_stable_and_keeps_source_metadata(self):
+        checks = [check("AC-1", ids=["shared", "ac"]), check("TC-1", metric="TC", ids=["shared", "tc"])]
+        evidence = copy.deepcopy(EVIDENCE)
+        evidence["shared"]["completeness"] = {"truncated": False}
+        for eid in ("ac", "tc", "task:request"):
+            evidence[eid] = {"id": eid, "scope": "task" if eid == "task:request" else "observation",
+                             "kind": "task_request" if eid == "task:request" else "artifact",
+                             "origin": {"pointer": "/" + eid}, "content_hash": eid, "data": eid + " content"}
+        requests = []
+        report = evaluate_prepared(plan(checks), checks, evidence, verdicts, request_sink=requests,
+                                   scoring_mode="metric", common_evidence_mode="shared")
+        self.assertEqual(len(requests), 2)
+        prefixes = [r["user"][:r["common_prefix_chars"]] for r in requests]
+        self.assertEqual(prefixes[0], prefixes[1])
+        self.assertEqual(requests[0]["common_prefix_hash"], requests[1]["common_prefix_hash"])
+        expected_hash = hashlib.sha256(json.dumps(
+            {"system": requests[0]["system"], "user_prefix": prefixes[0]},
+            sort_keys=True, ensure_ascii=False, separators=(",", ":")).encode()).hexdigest()
+        self.assertEqual(requests[0]["common_prefix_hash"], expected_hash)
+        body = json.loads(requests[0]["user"])
+        self.assertEqual(list(body), ["common", "metric_ids", "evidence", "checks"])
+        self.assertEqual(body["common"]["evidence"]["shared"], evidence["shared"])
+        self.assertEqual(body["common"]["evidence"]["task:request"], evidence["task:request"])
+        self.assertEqual(list(body["evidence"]), ["ac"])
+        self.assertEqual(body["evidence"]["ac"], evidence["ac"])
+        self.assertTrue(report["execution"]["evidence_visibility_expanded"])
+        self.assertEqual(report["execution"]["groups"][0]["additional_common_evidence_ids"], ["task:request"])
+        reversed_evidence = {eid: dict(reversed(list(record.items())))
+                             for eid, record in reversed(list(evidence.items()))}
+        repeated = build_group_request(build_groups(checks, reversed_evidence,
+            scoring_mode="metric", common_evidence_mode="shared")[0])
+        self.assertEqual(repeated["common_prefix_hash"], expected_hash)
+
+    def test_common_prefix_is_frozen_across_dependency_waves(self):
+        checks = [check("AC-1"), check("TC-1", metric="TC")]
+        checks[1]["bindings"] = {"path": "/evaluation/checks/AC-1/score"}
+        evidence = copy.deepcopy(EVIDENCE)
+        evidence["only-ac"] = {"id": "only-ac", "scope": "observation", "kind": "artifact", "data": "A"}
+        checks[0]["evidence_ids"].append("only-ac")
+        requests = []
+        report = evaluate_prepared(plan(checks), checks, evidence, verdicts, request_sink=requests,
+                                   scoring_mode="metric", common_evidence_mode="shared")
+        self.assertEqual(len(requests), 2)
+        self.assertEqual(requests[0]["common_prefix_hash"], requests[1]["common_prefix_hash"])
+        self.assertNotIn("only-ac", json.loads(requests[0]["user"])["common"]["evidence"])
+        self.assertTrue(report["metrics"]["TC"]["verdict"])
+
+    def test_packs_share_trace_prefix_across_metrics_without_expanding_evidence(self):
+        evidence = copy.deepcopy(EVIDENCE)
+        for eid in ("trace-a", "trace-b", "trace-c"):
+            evidence[eid] = {"id": eid, "kind": "trace_payload", "scope": "observation",
+                             "data": {"input": eid, "output": eid + " result", "evidence_ref": "external"},
+                             "origin": {"pointer": "/events/" + eid}, "completeness": {"truncated": False}}
+        evidence["external"] = {"id": "external", "data": "Can be read through the evidence tool"}
+        checks = [check("AC-1", ids=["shared", "trace-a", "trace-b"]),
+                  check("TC-1", metric="TC", ids=["shared", "trace-a"]),
+                  check("PE-1", metric="PE", ids=["shared", "trace-c"])]
+        before = copy.deepcopy((checks, evidence))
+        exports = {}
+        for mode in ("shared", "packs"):
+            exports[mode] = [build_group_request(g) for g in build_groups(
+                checks, evidence, scoring_mode="metric", common_evidence_mode=mode)]
+        for old, new in zip(exports["shared"], exports["packs"]):
+            old_body, new_body = json.loads(old["user"]), json.loads(new["user"])
+            self.assertEqual(old_body, new_body)  # Only ordering changes, including all provenance.
+            self.assertEqual(new["request_chars"], old["request_chars"])
+            self.assertEqual(list(new_body), ["common", "evidence", "metric_ids", "checks"])
+            self.assertNotIn("external", new_body["evidence"])
+            self.assertNotIn('"metric_ids"', new["user"][:new["evidence_prefix_chars"]])
+        ac, tc, pe = exports["packs"]
+        a_boundary = ac["pack_prefixes"][0]
+        self.assertEqual(a_boundary, tc["pack_prefixes"][0])
+        self.assertEqual(ac["user"][:a_boundary["prefix_chars"]], tc["user"][:a_boundary["prefix_chars"]])
+        self.assertEqual(len(ac["evidence_pack_ids"]), 2)
+        self.assertEqual(len(tc["evidence_pack_ids"]), 1)
+        self.assertNotEqual(ac["evidence_prefix_hash"], tc["evidence_prefix_hash"])
+        self.assertNotEqual(a_boundary["prefix_hash"], pe["pack_prefixes"][0]["prefix_hash"])
+        self.assertEqual((checks, evidence), before)
+
+    def test_pack_plan_and_prefix_survive_batching_and_dependency_waves(self):
+        evidence = copy.deepcopy(EVIDENCE)
+        for eid in ("trace-a", "trace-b"):
+            evidence[eid] = {"id": eid, "kind": "trace_payload", "scope": "observation", "data": eid}
+        checks = [check("AC-1", ids=["shared", "trace-a"]),
+                  check("AC-2", ids=["shared", "trace-a"]),
+                  check("TC-1", metric="TC", ids=["shared", "trace-a"]),
+                  check("PE-1", metric="PE", ids=["shared", "trace-b"])]
+        checks[2]["bindings"] = {"path": "/evaluation/checks/AC-1/score"}
+        requests = []
+        report = evaluate_prepared(plan(checks), checks, evidence, verdicts, request_sink=requests,
+                                   scoring_mode="metric", common_evidence_mode="packs", max_checks=1)
+        reused = [r for r in requests if r["metric_id"] in {"AC", "TC"}]
+        self.assertEqual(len(reused), 3)
+        self.assertEqual(len({r["evidence_prefix_hash"] for r in reused}), 1)
+        self.assertEqual(len({r["user"][:r["evidence_prefix_chars"]] for r in reused}), 1)
+        self.assertEqual(len(report["execution"]["evidence_packs"]["packs"]), 2)
+        self.assertTrue(all(r["verdict"] for r in report["checks"].values()))
+        # The same content and plan give the same prefixes despite dict/input order.
+        reversed_evidence = {eid: dict(reversed(list(record.items())))
+                             for eid, record in reversed(list(evidence.items()))}
+        repeated = []
+        evaluate_prepared(plan(checks), list(reversed(checks)), reversed_evidence, verdicts,
+                          request_sink=repeated, scoring_mode="metric", common_evidence_mode="packs", max_checks=1)
+        self.assertEqual({r["check_ids"][0]: r["evidence_prefix_hash"] for r in requests},
+                         {r["check_ids"][0]: r["evidence_prefix_hash"] for r in repeated})
+
+    def test_pack_hash_tracks_content_and_prefix_hash_tracks_preceding_context(self):
+        evidence = copy.deepcopy(EVIDENCE)
+        evidence["a"] = {"id": "a", "scope": "observation", "kind": "trace_payload", "data": "A"}
+        evidence["b"] = {"id": "b", "scope": "observation", "kind": "trace_payload", "data": "B"}
+        checks = [check("AC-1", ids=["shared", "a"]), check("TC-1", metric="TC", ids=["shared", "b"])]
+        def request():
+            return build_group_request(build_groups(checks, evidence, scoring_mode="metric",
+                                                     common_evidence_mode="packs")[0])
+        first = request()
+        evidence["shared"]["data"] = "Different preceding context"
+        changed_context = request()
+        self.assertEqual(first["evidence_pack_ids"], changed_context["evidence_pack_ids"])
+        self.assertNotEqual(first["pack_prefixes"][0]["prefix_hash"], changed_context["pack_prefixes"][0]["prefix_hash"])
+        evidence["a"]["data"] = "Changed trace content"
+        changed_trace = request()
+        self.assertNotEqual(changed_context["evidence_pack_ids"], changed_trace["evidence_pack_ids"])
+        self.assertNotEqual(changed_context["evidence_prefix_hash"], changed_trace["evidence_prefix_hash"])
+
+    def test_pack_budget_does_not_truncate_or_drop_multi_record_evidence(self):
+        evidence = {"a": {"id": "a", "data": "large original trace " * 300},
+                    "b": {"id": "b", "data": "follow-up event " * 300},
+                    "c": {"id": "c", "data": "separate observation"}}
+        checks = [check("AC-1", ids=["a", "b"]), check("TC-1", metric="TC", ids=["c"])]
+        options = dict(scoring_mode="metric", common_evidence_mode="packs",
+                       request_overhead_chars=200, output_reserve_chars=100, tool_reserve_chars=100)
+        groups = build_groups(checks, evidence, **options)
+        size = groups[0]["request_chars"]
+        exact = build_groups(checks, evidence, max_chars=size, **options)[0]
+        self.assertEqual(exact["status"], "ready")
+        blocked = build_groups(checks, evidence, max_chars=size - 1, **options)[0]
+        self.assertEqual(blocked["reason"], "request_budget_exceeded")
+        self.assertEqual(json.loads(build_group_request(blocked)["user"])["evidence"],
+                         {eid: evidence[eid] for eid in ("a", "b")})
+        broken = copy.deepcopy(exact)
+        del broken["evidence"]["b"]
+        with self.assertRaisesRegex(ValueError, "expand"):
+            build_group_request(broken)
+        broken = copy.deepcopy(exact)
+        broken["evidence_packs"] = []
+        with self.assertRaisesRegex(ValueError, "cover"):
+            build_group_request(broken)
+
+    def test_full_budget_includes_overhead_and_reserves(self):
+        checks = [check("AC-1")]
+        base = build_groups(checks, EVIDENCE)[0]["request_chars"]
+        options = {"request_overhead_chars": 100, "output_reserve_chars": 200, "tool_reserve_chars": 300}
+        exact = build_groups(checks, EVIDENCE, max_chars=base + 600, **options)[0]
+        self.assertEqual(exact["status"], "ready")
+        self.assertEqual(exact["input_request_chars"], base + 100)
+        self.assertEqual(exact["request_chars"], base + 600)
+        request = build_group_request(exact)
+        self.assertEqual(request["tool_reserve_chars"], 300)
+        no_tools = build_group_request(build_groups(checks, EVIDENCE, tool_reserve_chars=0)[0])
+        self.assertEqual(no_tools["tool_reserve_chars"], 0)
+        legacy = build_group_request(build_groups(checks, EVIDENCE)[0])
+        self.assertNotIn("tool_reserve_chars", legacy)
+        blocked = build_groups(checks, EVIDENCE, max_chars=base + 599, **options)[0]
+        self.assertEqual(blocked["reason"], "request_budget_exceeded")
+        self.assertEqual(blocked["evidence"], EVIDENCE)
+
+    def test_bounded_common_index_keeps_full_supplement_and_reports_omissions(self):
+        checks = [check("AC-1")]
+        evidence = copy.deepcopy(EVIDENCE)
+        evidence["shared"]["data"] = "long trace " * 200
+        for n in range(30):
+            evidence[str(n)] = {"id": str(n), "scope": "observation", "kind": "trace_event",
+                                 "origin": {"pointer": "/events/" + str(n)}, "data": "trace"}
+        request = build_group_request(build_groups(checks, evidence, scoring_mode="metric",
+            common_evidence_mode="shared", common_prefix_max_chars=800)[0])
+        self.assertLessEqual(request["common_prefix_chars"], 800)
+        body = json.loads(request["user"])
+        self.assertFalse(body["common"]["selection"]["index_complete"])
+        self.assertEqual(body["common"]["selection"]["total_records"], len(evidence))
+        self.assertEqual(body["evidence"]["shared"], evidence["shared"])
+        self.assertEqual(body["checks"][0]["evidence_ids"], ["shared"])
+
+    def test_compact_index_excludes_large_metadata_and_preserves_loaded_records(self):
+        evidence = copy.deepcopy(EVIDENCE)
+        for eid, length in (("shared", 1000), ("ac", 20000), ("index-only", 100000)):
+            evidence[eid] = {"id": eid, "scope": "observation", "kind": "artifact",
+                             "data": {"text": "original " + eid},
+                             "origin": {"pointer": "/" + eid, "details": "o" * length},
+                             "content_hash": "h" * length,
+                             "arbitrary_metadata": {"payload": "m" * length},
+                             "completeness": {"truncated": False}}
+        before = copy.deepcopy(evidence)
+        checks = [check("AC-1", ids=["shared", "ac"]), check("TC-1", metric="TC")]
+        groups = build_groups(checks, evidence, max_chars=200000, scoring_mode="metric",
+                              common_evidence_mode="shared")
+        payload = json.loads(build_group_request(groups[0])["user"])
+        common = payload["common"]
+        self.assertEqual(common["schema_version"], "score-common/2")
+        self.assertEqual({entry["id"] for entry in common["evidence_index"]}, set(evidence))
+        for entry in common["evidence_index"]:
+            self.assertEqual(set(entry), {"id", "kind", "scope"})
+        self.assertEqual(common["evidence"]["shared"], evidence["shared"])
+        self.assertEqual(payload["evidence"]["ac"], evidence["ac"])
+        self.assertTrue(common["selection"]["index_complete"])
+        self.assertEqual(evidence, before)
+
+    def test_index_budget_stays_small_when_total_prefix_budget_increases(self):
+        evidence = copy.deepcopy(EVIDENCE)
+        for number in range(200):
+            eid = "event:" + str(number).zfill(4)
+            evidence[eid] = {"id": eid, "scope": "observation", "kind": "trace_event",
+                             "data": {"event": number}, "origin": {"pointer": "/events/" + str(number)}}
+        requests = []
+        for limit in (12000, 24000):
+            request = build_group_request(build_groups([check("AC-1")], evidence,
+                scoring_mode="metric", common_evidence_mode="shared", common_prefix_max_chars=limit)[0])
+            common = json.loads(request["user"])["common"]
+            index = common["evidence_index"]
+            self.assertLessEqual(len(canonical(index)), 2000)
+            self.assertEqual(common["selection"]["index_max_chars"], 2000)
+            self.assertEqual(common["selection"]["indexed_records"], len(index))
+            self.assertEqual(common["selection"]["total_records"], len(evidence))
+            self.assertFalse(common["selection"]["index_complete"])
+            self.assertGreater(len(index), 0)
+            self.assertLess(len(index), len(evidence))
+            self.assertLess(request["common_prefix_chars"], 4000)
+            requests.append(request)
+        self.assertEqual(requests[0]["common_prefix_hash"], requests[1]["common_prefix_hash"])
+
+    def test_compact_table_locator_reads_complete_record_and_schema(self):
+        schema_id = "table:fixture:schema"
+        row_id = "table:fixture:row:ROW-1:1"
+        evidence = {
+            schema_id: {"id": schema_id, "scope": "reference", "kind": "table_schema",
+                        "data": {"table_id": "table:fixture", "columns": ["record_id", "value"]},
+                        "origin": {"pointer": "/reference/table/header"}, "content_hash": "schema-hash"},
+            row_id: {"id": row_id, "scope": "reference", "kind": "table_row",
+                     "data": {"table_id": "table:fixture", "values": ["ROW-1", "original value"]},
+                     "origin": {"pointer": "/reference/table/rows/0"}, "content_hash": "row-hash",
+                     "table_id": "table:fixture", "business_id": "ROW-1", "schema_id": schema_id}}
+        request = build_group_request(build_groups([check("AC-1", ids=[row_id])], evidence,
+            scoring_mode="metric", common_evidence_mode="shared")[0])
+        locator = next(entry for entry in json.loads(request["user"])["common"]["evidence_index"]
+                       if entry["id"] == row_id)
+        self.assertEqual(set(locator), {"id", "kind", "scope"})
+        with tempfile.TemporaryDirectory() as directory:
+            bundle = Path(directory)
+            write_json(bundle / "evidence.json", evidence)
+            write_json(bundle / "index.json", make_index(evidence))
+            result = EvidenceStore(bundle).read([locator["id"]])
+        self.assertTrue(result["complete"])
+        self.assertEqual({record["id"]: record for record in result["records"]}, evidence)
+
+    def test_invalid_modes_and_budgets_rejected_for_program_only_plan(self):
+        checks = [check("AC-3", "P")]
+        for kwargs in ({"scoring_mode": "invalid"}, {"common_evidence_mode": "invalid"},
+                       {"output_reserve_chars": -1}, {"tool_reserve_chars": True},
+                       {"request_overhead_chars": 1.1}):
+            with self.subTest(kwargs=kwargs), self.assertRaises(ValueError):
+                evaluate_prepared(plan(checks), checks, EVIDENCE, **kwargs)
+
+    def test_metric_isolation_preserves_hybrid_and_global_dependencies(self):
+        checks = [check("AC-1"), check("TC-1", "H", metric="TC"),
+                  check("BC-1", "P", metric="BC")]
+        checks[1]["bindings"] = {"path": "/evaluation/checks/AC-1/score"}
+        checks[2]["bindings"] = {"path": "/evaluation/checks/TC-1/score"}
+        def program(data, bindings):
+            prerequisite = bindings["path"].split("/")[3]
+            self.assertEqual(data["evaluation"]["checks"][prerequisite]["score"], 1)
+            return {"status": "scored", "score": 1}
+        results = []
+        for mode, layout in (("baseline", "shared"), ("metric", "shared"), ("metric", "packs")):
+            report = evaluate_prepared(plan(checks), checks, EVIDENCE, verdicts,
+                {"assert": program}, scoring_mode=mode, common_evidence_mode=layout)
+            self.assertEqual(report["execution"]["program_call_count"], 2)
+            self.assertEqual(report["execution"]["judge_call_count"], 2)
+            self.assertEqual(len({g["common_prefix_hash"] for g in report["execution"]["groups"]}), 1)
+            results.append({k: report[k] for k in ("checks", "rubrics", "metrics")})
+        self.assertEqual(results[0], results[1])
+        self.assertEqual(results[0], results[2])
+
     def test_shared_evidence_once_separate_verdicts(self):
         checks = [check("AC-1"), check("TC-1", metric="TC")]
         requests = []
@@ -131,7 +488,8 @@ class GroupedScoringTests(unittest.TestCase):
         before = copy.deepcopy(prepared)
         report = evaluate_prepared(prepared, checks, EVIDENCE, verdicts)
         self.assertTrue(report["checks"]["AC-1"]["verdict"])
-        self.assertEqual(report["rubrics"]["AC-1"], {"status": "scored", "verdict": True})
+        self.assertEqual(report["rubrics"]["AC-1"], {"status": "scored", "verdict": True,
+                                                     "check_ids": ["AC-1"], "failed_check_ids": []})
         self.assertTrue(report["metrics"]["AC"]["verdict"])
         self.assertEqual(report["unresolved"], prepared["unresolved"])
         self.assertEqual(report["execution"]["rubric_diagnostics"]["AC-1"]["missing"],
@@ -145,7 +503,8 @@ class GroupedScoringTests(unittest.TestCase):
         prepared = plan(checks)
         prepared["unresolved"] = [{"rubric_id": "AC-1", "missing": ["Missing reference"]}]
         report = evaluate_prepared(prepared, checks, EVIDENCE, lambda r: verdicts(r, False))
-        self.assertEqual(report["rubrics"]["AC-1"], {"status": "scored", "verdict": False})
+        self.assertEqual(report["rubrics"]["AC-1"], {"status": "scored", "verdict": False,
+                                                     "check_ids": ["AC-1"], "failed_check_ids": ["AC-1"]})
         self.assertFalse(report["metrics"]["AC"]["verdict"])
         self.assertTrue(report["unresolved"])
 

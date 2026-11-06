@@ -3,7 +3,7 @@ metric_id: EG
 name: Evidence Validity & Freshness
 name_zh: 证据有效性与时效性
 definition: 当前证据的来源、版本与时效是否满足指定要求？
-boundary: 证据自身来源、版本和时效；不重复计分状态传播错误。
+boundary: 证据自身来源、版本和时效；必要输入是否实际取得归EG-3，不将输入缺失直接判作来源或版本无效，不重复计分状态传播错误。
 inputs:
 - 证据来源、版本、时间
 - 决策时间
