@@ -657,6 +657,29 @@ class InstantiationTests(unittest.TestCase):
             with self.subTest(changed=changed), self.assertRaises(ValueError):
                 validate_candidate(self.plan, self.store, proposed)
 
+    def test_exhausted_validation_can_be_frozen_as_explicit_gaps(self):
+        def generator(request):
+            proposed = candidate()
+            bad = task_check("bad-quote")
+            bad["source_refs"] = [{"evidence_id": "task:request", "quote": "an invented rule sentence"}]
+            entry(proposed)["checks"].append(bad)
+            return proposed
+
+        with self.assertRaises(SourceQuoteError):
+            instantiate_plan(self.plan, self.store, generator, [])
+        frozen = instantiate_plan(self.plan, self.store, generator, [], degrade=True)
+        ids = [check["id"] for check in frozen["task_checks"]]
+        self.assertIn("deliver-summary", ids)
+        self.assertNotIn("bad-quote", ids)
+        meta = frozen["instantiation"]["provenance"]["degradation"]
+        self.assertTrue(meta["applied"])
+        self.assertEqual([item["check_id"] for item in meta["dropped_checks"]], ["bad-quote"])
+        notes = [note for item in frozen["unresolved"] for note in item["missing"]]
+        self.assertTrue(any("bad-quote" in note for note in notes))
+        verify_instantiated(frozen, self.store)
+
+
+
 
 if __name__ == '__main__':
     unittest.main()

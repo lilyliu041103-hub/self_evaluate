@@ -934,7 +934,7 @@ def freeze_plan(base_plan, store, candidate, provenance=None):
     return plan
 
 
-def instantiate_plan(base_plan, store, generator_fn, request_sink=None, provenance=None):
+def instantiate_plan(base_plan, store, generator_fn, request_sink=None, provenance=None, degrade=False):
     """One generation stage, with at most one correction from local diagnostics."""
     request = build_instantiation_request(base_plan, store)
     for attempt in range(2):
@@ -948,6 +948,8 @@ def instantiate_plan(base_plan, store, generator_fn, request_sink=None, provenan
             candidate = validate_candidate(base_plan, store, candidate)
         except ValueError as exc:
             if attempt:
+                if degrade:
+                    return _freeze_degraded(base_plan, store, candidate, exc, provenance)
                 raise
             body = json.loads(request['user'])
             body['local_feedback'] = {'code': 'local_validation_failed', 'error': str(exc),
@@ -960,6 +962,8 @@ def instantiate_plan(base_plan, store, generator_fn, request_sink=None, provenan
         if not gaps:
             return freeze_plan(base_plan, store, candidate, provenance)
         if attempt:
+            if degrade:
+                return _freeze_degraded(base_plan, store, candidate, ToolSchemaCoverageError(gaps), provenance)
             raise ToolSchemaCoverageError(gaps)
         body = json.loads(request['user'])
         body['local_feedback'] = {'code': 'available_tool_schema_omitted', 'gaps': gaps,
@@ -967,6 +971,74 @@ def instantiate_plan(base_plan, store, generator_fn, request_sink=None, provenan
         body['previous_candidate'] = candidate
         request = {**request, 'user': canonical(body)}
     raise AssertionError('Unreachable')
+
+
+def _prune_candidate(base_plan, store, candidate, error):
+    """Keep checks that pass isolated validation and turn the rest into explicit gaps."""
+    profiles = _profiles(base_plan)
+    dropped, by_rubric = [], {}
+    entries = candidate.get("rubrics") if isinstance(candidate, dict) else None
+    for entry in entries if isinstance(entries, list) else []:
+        if not isinstance(entry, dict):
+            continue
+        rid = entry.get("rubric_id")
+        if rid not in profiles or rid in by_rubric:
+            continue
+        unresolved = [item for item in (entry.get("unresolved") or []) if isinstance(item, str)]
+        checks = []
+        for check in entry.get("checks") or []:
+            if not isinstance(check, dict):
+                continue
+            isolated = {"rubrics": [{"rubric_id": key, "checks": [check] if key == rid else [],
+                                     "unresolved": ["Isolated local validation only."]} for key in profiles]}
+            try:
+                validate_candidate(base_plan, store, isolated)
+            except ValueError as exc:
+                dropped.append({"rubric_id": rid, "check_id": check.get("id"), "error": str(exc)})
+                unresolved.append("check " + str(check.get("id")) + " dropped after local validation: " + str(exc))
+                continue
+            checks.append(check)
+        if not checks and not unresolved:
+            unresolved.append("Kept as unresolved after local validation: " + str(error))
+        by_rubric[rid] = {"rubric_id": rid, "checks": checks, "unresolved": unresolved}
+    for rid in profiles:
+        if rid not in by_rubric:
+            by_rubric[rid] = {"rubric_id": rid, "checks": [],
+                              "unresolved": ["Not generated; local validation failed: " + str(error)]}
+    for _ in range(12):
+        trial = {"rubrics": [by_rubric[profile["id"]] for profile in base_plan["profiles"]]}
+        try:
+            return validate_candidate(base_plan, store, trial), dropped
+        except ValueError as exc:
+            message = str(exc)
+            target = None
+            for marker in ("Cyclic check dependency: ", "check dependency: "):
+                if marker in message:
+                    target = message.split(marker, 1)[1].strip()
+                    break
+            if not target:
+                return None, dropped
+            removed = False
+            for entry in by_rubric.values():
+                kept = [check for check in entry["checks"] if check.get("id") != target]
+                if len(kept) != len(entry["checks"]):
+                    entry["checks"] = kept
+                    entry["unresolved"].append("check " + target + " dropped for a broken dependency: " + message)
+                    removed = True
+            if not removed:
+                return None, dropped
+    return None, dropped
+
+
+def _freeze_degraded(base_plan, store, candidate, error, provenance):
+    """Freeze a partial plan: valid checks survive, rejected ones become unresolved notes."""
+    degraded, dropped = _prune_candidate(base_plan, store, candidate, error)
+    if degraded is None:
+        raise error
+    meta = copy.deepcopy(provenance) if isinstance(provenance, dict) else {}
+    meta["degradation"] = {"applied": True, "reason": str(error), "dropped_count": len(dropped),
+                           "dropped_checks": dropped}
+    return freeze_plan(base_plan, store, degraded, meta)
 
 
 def _candidate_diagnostics(base_plan, store, candidate):
