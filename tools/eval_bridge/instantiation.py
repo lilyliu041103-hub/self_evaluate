@@ -77,6 +77,38 @@ def _strings(value):
             yield from _strings(child)
 
 
+_QUOTE_TRANSLATION = str.maketrans({
+    '“': '"', '”': '"', '「': '"', '」': '"', '『': '"', '』': '"', '＂': '"',
+    '‘': "'", '’': "'", '`': "'", '´': "'",
+})
+
+
+def _canon_quote(text):
+    """Fold typographic quotes and drop whitespace, nothing else.
+
+    The contract forbids paraphrase; it does not require reproducing the exact
+    quote glyph or the line wrapping the source happened to use. Whitespace is
+    removed rather than collapsed so a quote reflowed at any column still
+    matches, while one differing character still fails.
+    """
+    folded = str(text).translate(_QUOTE_TRANSLATION)
+    return re.sub(r'\s+', '', folded)
+
+
+def _quote_matches(quote, data):
+    """Verbatim match first; accept only quote/whitespace folding as a fallback."""
+    if not str(quote).strip():
+        return False
+    values = list(_strings(data))
+    if any(quote in value for value in values) or quote in canonical(data):
+        return True
+    target = _canon_quote(quote)
+    if not target:
+        return False
+    if any(target in _canon_quote(value) for value in values):
+        return True
+    return target in _canon_quote(canonical(data))
+
 def _profiles(plan):
     profiles = plan.get('profiles')
     if not isinstance(profiles, list) or len(profiles) != 22:
@@ -834,7 +866,7 @@ def validate_candidate(base_plan, store, response):
                     data = records[eid]['data']
                 else:
                     raise ValueError('Rule source must be task/reference/rubric or an observed tool_contract: ' + eid)
-                if not any(quote in value for value in _strings(data)) and quote not in canonical(data):
+                if not _quote_matches(quote, data):
                     raise SourceQuoteError(rid, cid, source_index, eid, quote, data)
             if rid in ('TC-1', 'EG-3') and not reference_source:
                 raise ValueError(rid + ' requires a task/reference rule source: ' + cid)
