@@ -289,9 +289,9 @@ class ModelClient:
                 try:
                     return _decode_json(message['content'])
                 except json.JSONDecodeError as exc:
-                    # One format-only retry for plan generation. Scoring retains
-                    # its existing evidence/context budget and failure behavior.
-                    if self.role != 'instantiate' or len(message['content']) > 60000:
+                    # One format-only retry. Scoring keeps its evidence and context
+                    # budget; only the malformed final answer is re-requested.
+                    if self.role not in ('instantiate', 'score') or len(message['content']) > 60000:
                         raise
                     repair_body = copy.deepcopy(body)
                     repair_body['tool_choice'] = 'none'
@@ -301,7 +301,7 @@ class ModelClient:
                             'code': 'invalid_json', 'line': exc.lineno,
                             'column': exc.colno, 'position': exc.pos, 'error': exc.msg,
                             'instruction': _fragment('prompts/bridge/fragments/client.json', 'fragment_1')})}]
-                    repaired = self._send(repair_body, stage='instantiate_json_repair', metric_id=metric_id,
+                    repaired = self._send(repair_body, stage=self.role + '_json_repair', metric_id=metric_id,
                                           common_prefix_hash=common_prefix_hash,
                                           effective_prefix_hash=effective_prefix_hash, prefix_audit=prefix_audit)
                     corrected = repaired['choices'][0]

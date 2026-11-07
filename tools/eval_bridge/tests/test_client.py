@@ -45,8 +45,8 @@ class ClientTests(unittest.TestCase):
         self.assertGreater(feedback['column'], 0)
         self.assertIn('instantiate_json_repair', (self.root / 'logs/calls.jsonl').read_text())
 
-    def test_invalid_json_repair_does_not_loop_or_apply_to_score(self):
-        for role, expected in [('instantiate', 2), ('score', 1)]:
+    def test_invalid_json_repair_retries_once_for_plan_and_scoring(self):
+        for role, expected in [('instantiate', 2), ('score', 2)]:
             seen = []
             def respond(body):
                 seen.append(body)
