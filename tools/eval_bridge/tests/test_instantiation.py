@@ -678,6 +678,53 @@ class InstantiationTests(unittest.TestCase):
         self.assertTrue(any("bad-quote" in note for note in notes))
         verify_instantiated(frozen, self.store)
 
+    def test_mechanical_normalisation_repairs_instead_of_rejecting(self):
+        self.plan["methods"] = {"TU-2": "J"}
+        calls = []
+
+        def generator(request):
+            calls.append(request)
+            proposed = candidate()
+            check = entry(proposed)["checks"][0]
+            check["evidence_kinds"] = list(check["evidence_kinds"]) + ["not-in-profile"]
+            check["reference_ids"] = []
+            check["source_refs"] = [{"evidence_id": "task:request", "quote": "submit a Chinese summary"}]
+            return proposed
+
+        with self.assertRaises(ValueError):
+            instantiate_plan(self.plan, self.store, generator, [])
+        calls.clear()
+        frozen = instantiate_plan(self.plan, self.store, generator, [], normalise=True)
+        self.assertEqual(len(calls), 1)
+        self.assertEqual([check["id"] for check in frozen["task_checks"]], ["deliver-summary"])
+        meta = frozen["instantiation"]["provenance"]["normalisation"]
+        self.assertTrue(meta["applied"])
+        self.assertEqual(meta["edits"][0]["check_id"], "deliver-summary")
+        self.assertEqual(meta["edits"][0]["evidence_kinds"], ["not-in-profile"])
+        self.assertEqual(meta["edits"][0]["reference_ids"], ["task:request"])
+        verify_instantiated(frozen, self.store)
+
+    def test_mechanical_normalisation_keeps_ungrounded_check_as_gap(self):
+        self.plan["methods"] = {"TU-2": "J"}
+        calls = []
+
+        def generator(request):
+            calls.append(request)
+            proposed = candidate()
+            broken = task_check("broken-citation")
+            broken["evidence_kinds"] = ["not-in-profile"]
+            broken["reference_ids"] = []
+            broken["source_refs"] = [{"evidence_id": "ac1-medium-20261105", "quote": "anything"}]
+            entry(proposed)["checks"].append(broken)
+            return proposed
+
+        frozen = instantiate_plan(self.plan, self.store, generator, [], normalise=True)
+        ids = [check["id"] for check in frozen["task_checks"]]
+        self.assertEqual(ids, ["deliver-summary"])
+        notes = [note for item in frozen["unresolved"] for note in item["missing"]]
+        self.assertTrue(any("broken-citation" in note for note in notes))
+        verify_instantiated(frozen, self.store)
+
     def test_targeted_repair_asks_only_for_the_failing_rubric(self):
         self.plan["methods"] = {"TU-2": "J"}
         calls = []

@@ -1,4 +1,4 @@
-"""Instantiate concrete checks for one execution and validate them locally."""
+﻿"""Instantiate concrete checks for one execution and validate them locally."""
 from __future__ import annotations
 from .resources import literal as _fragment
 from .resources import text as _resource_text, literal as _resource_literal
@@ -935,7 +935,8 @@ def freeze_plan(base_plan, store, candidate, provenance=None):
     return plan
 
 
-def instantiate_plan(base_plan, store, generator_fn, request_sink=None, provenance=None, degrade=False):
+def instantiate_plan(base_plan, store, generator_fn, request_sink=None, provenance=None, degrade=False,
+                     normalise=False):
     """One generation stage, with bounded correction from local diagnostics.
 
     When local validation pinpoints individual rubrics, the correction asks the
@@ -950,6 +951,13 @@ def instantiate_plan(base_plan, store, generator_fn, request_sink=None, provenan
     iteration = 0
     repairs = 0
     last_errors = None
+    edits = []
+
+    def _provenance():
+        meta = copy.deepcopy(provenance) if isinstance(provenance, dict) else {}
+        if normalise:
+            meta['normalisation'] = {'applied': bool(edits), 'edits': copy.deepcopy(edits)}
+        return meta
     while True:
         iteration += 1
         if request_sink is not None:
@@ -960,6 +968,8 @@ def instantiate_plan(base_plan, store, generator_fn, request_sink=None, provenan
         response = generator_fn(copy.deepcopy(request))
         merged = _merge_repair(previous, response) if repairing else None
         candidate = merged if merged is not None else response
+        if normalise:
+            candidate = _normalise_candidate(base_plan, store, candidate, edits)
         try:
             candidate = validate_candidate(base_plan, store, candidate)
         except ValueError as exc:
@@ -982,14 +992,14 @@ def instantiate_plan(base_plan, store, generator_fn, request_sink=None, provenan
                 request = {**request, 'user': canonical(body)}
                 continue
             if degrade:
-                return _freeze_degraded(base_plan, store, candidate, exc, provenance)
+                return _freeze_degraded(base_plan, store, candidate, exc, _provenance())
             raise
         gaps = _tool_schema_gaps(base_plan, store, candidate)
         if not gaps:
-            return freeze_plan(base_plan, store, candidate, provenance)
+            return freeze_plan(base_plan, store, candidate, _provenance())
         if iteration > 1:
             if degrade:
-                return _freeze_degraded(base_plan, store, candidate, ToolSchemaCoverageError(gaps), provenance)
+                return _freeze_degraded(base_plan, store, candidate, ToolSchemaCoverageError(gaps), _provenance())
             raise ToolSchemaCoverageError(gaps)
         repairing, previous = False, None
         body = json.loads(request['user'])
@@ -998,6 +1008,89 @@ def instantiate_plan(base_plan, store, generator_fn, request_sink=None, provenan
             'instruction': _fragment('prompts/bridge/fragments/instantiation.json', 'fragment_7')}
         body['previous_candidate'] = candidate
         request = {**request, 'user': canonical(body)}
+
+
+def _normalise_candidate(base_plan, store, candidate, edits=None):
+    """Repair mechanically invalid evidence wiring without touching the semantics.
+
+    Drops evidence kinds and citations that cannot resolve in this execution,
+    declares task/reference records that a check already cites, derives the kind
+    of each declared observation, and turns a check that keeps no usable
+    citation into an explicit unresolved gap instead of a failed generation.
+    """
+    if not isinstance(candidate, dict) or not isinstance(candidate.get('rubrics'), list):
+        return candidate
+    profiles, records = _profiles(base_plan), store.records
+    normalised = copy.deepcopy(candidate)
+    for entry in normalised['rubrics']:
+        if not isinstance(entry, dict):
+            continue
+        profile = profiles.get(entry.get('rubric_id'))
+        if profile is None or not isinstance(entry.get('checks'), list):
+            continue
+        allowed = set(profile['where']) | {'trace_payload_part', 'run_status'}
+        kept, dropped = [], []
+        for check in entry['checks']:
+            if not isinstance(check, dict) or set(check) != set(_CHECK_KEYS):
+                kept.append(check)
+                continue
+            kinds = [kind for kind in check['evidence_kinds'] if kind in allowed]
+            references = [eid for eid in check['reference_ids']
+                          if eid in records and records[eid]['scope'] in _REFERENCE_SCOPES]
+            observations = []
+            for eid in check['observation_ids']:
+                if eid not in records or records[eid]['scope'] != 'observation':
+                    continue
+                kind = records[eid]['kind']
+                if kind not in allowed:
+                    continue
+                observations.append(eid)
+                if kind not in kinds:
+                    kinds.append(kind)
+            sources = []
+            for source in check['source_refs']:
+                if not isinstance(source, dict):
+                    continue
+                eid = source.get('evidence_id')
+                if eid == 'rubric:' + entry['rubric_id']:
+                    sources.append(source)
+                elif eid in records and (records[eid]['scope'] in _REFERENCE_SCOPES
+                                         or records[eid]['kind'] == 'tool_contract'):
+                    sources.append(source)
+                    if records[eid]['scope'] in _REFERENCE_SCOPES and eid not in references:
+                        references.append(eid)
+            before = (list(check['evidence_kinds']), list(check['reference_ids']),
+                      list(check['observation_ids']), list(check['source_refs']),
+                      copy.deepcopy(check['required_evidence']))
+            groups = [[kind for kind in group if kind in kinds]
+                      for group in check['required_evidence'] if isinstance(group, list)]
+            check['evidence_kinds'] = kinds
+            check['reference_ids'] = references
+            check['observation_ids'] = observations
+            check['required_evidence'] = [group for group in groups if group]
+            check['source_refs'] = sources
+            if edits is not None and before != (kinds, references, observations,
+                                                sources, check['required_evidence']):
+                edits.append({'rubric_id': entry['rubric_id'], 'check_id': str(check.get('id')),
+                              'evidence_kinds': sorted(set(before[0]) - set(kinds)),
+                              'reference_ids': sorted(set(references) - set(before[1])),
+                              'observation_ids': sorted(set(before[2]) - set(observations)),
+                              'source_refs': len(before[3]) - len(sources),
+                              'required_evidence': len(before[4]) - len(check['required_evidence'])})
+            if not kinds or not sources or not (references or observations):
+                dropped.append(str(check.get('id')))
+                if edits is not None:
+                    edits.append({'rubric_id': entry['rubric_id'], 'check_id': str(check.get('id')),
+                                  'dropped': True})
+                continue
+            kept.append(check)
+        entry['checks'] = kept
+        if dropped:
+            notes = entry.get('unresolved')
+            notes = list(notes) if isinstance(notes, list) else []
+            notes.append('机械性归一化：' + '、'.join(dropped) + ' 没有可解析的证据引用，已作为缺口保留。')
+            entry['unresolved'] = notes
+    return normalised
 
 
 def _repair_targets(base_plan, candidate, diagnostics):

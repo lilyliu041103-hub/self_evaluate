@@ -35,6 +35,8 @@ def parser():
     inst.add_argument('--max-tool-rounds', type=int, default=2)
     inst.add_argument('--degrade', action='store_true',
                       help='Freeze a partial plan instead of failing: rejected checks become unresolved gaps')
+    inst.add_argument('--normalise-evidence', dest='normalise_evidence', action='store_true',
+                      help='Repair mechanically invalid evidence wiring before validation instead of rejecting it')
     score = subs.add_parser('score', help='Execute locally validated checks for this exact run. Offline unless a model configuration is given.')
     score.add_argument('--bundle', required=True)
     score.add_argument('--plan', help='Frozen runtime plan for this exact observation and task/reference version')
@@ -126,6 +128,7 @@ def instantiate(args, store):
     try:
         plan = instantiate_plan(base, store, recorded, request_sink=requests,
                                 degrade=getattr(args, 'degrade', False),
+                                normalise=getattr(args, 'normalise_evidence', False),
                                 provenance={'roles': {'instantiate': {
                                     key: value for key, value in client.statistics().items()
                                     if key in ('role', 'model', 'base_url')}}})
