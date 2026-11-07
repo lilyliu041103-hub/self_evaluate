@@ -28,6 +28,14 @@
     "fragment_7": {
       "type": "scalar",
       "value": "Return a corrected full candidate. Cover every named attempt, including malformed and unexecuted actions. Read available contracts and add TU-2 P/H schema checks. If only protocol defects can be established, use a protocol_only P check. Preserve independent semantic checks and genuine unresolved prerequisites. A named source snapshot assesses that reference version."
+    },
+    "fragment_8": {
+      "type": "scalar",
+      "value": "Return only JSON of the shape {\"repair\": {\"rubrics\": [{\"rubric_id\": \"...\", \"checks\": [...], \"unresolved\": [...]}]}}: one complete replacement entry for every rubric listed under repair.rubrics. Copy every check that already passed local validation verbatim, replace the failing ones, and keep the same check contract, method and rubric assignment. Do not add rubrics. A rubric without checks must carry an explicit unresolved reason."
+    },
+    "fragment_9": {
+      "type": "scalar",
+      "value": "Correction stage. The candidate was already generated and locally validated; only the rubrics listed under repair.rubrics failed. Return corrected entries for those rubrics and nothing else. Keep the checks that already passed verbatim.\n"
     }
   }
 }

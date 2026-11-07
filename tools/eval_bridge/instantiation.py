@@ -51,6 +51,7 @@ _CHECK_KEYS = frozenset({
     'reference_ids', 'observation_ids', 'required_evidence', 'when', 'source_refs',
 })
 _WHEN_OPS = frozenset({'eq', 'ne', 'in', 'gt', 'gte', 'lt', 'lte', 'contains', 'exists'})
+_REPAIR_ROUNDS = 2
 
 INSTANTIATION_SYSTEM = _resource_text('prompts/bridge/instantiation_system.txt')
 
@@ -935,42 +936,160 @@ def freeze_plan(base_plan, store, candidate, provenance=None):
 
 
 def instantiate_plan(base_plan, store, generator_fn, request_sink=None, provenance=None, degrade=False):
-    """One generation stage, with at most one correction from local diagnostics."""
+    """One generation stage, with bounded correction from local diagnostics.
+
+    When local validation pinpoints individual rubrics, the correction asks the
+    model to replace only those rubric entries instead of rewriting the whole
+    candidate, and it may repeat while the failures keep shrinking. A response
+    that is not a repair payload is still read as a full candidate, so the
+    original one-shot contract remains valid.
+    """
     request = build_instantiation_request(base_plan, store)
-    for attempt in range(2):
+    repairing = False
+    previous = None
+    iteration = 0
+    repairs = 0
+    last_errors = None
+    while True:
+        iteration += 1
         if request_sink is not None:
             if callable(request_sink):
                 request_sink(copy.deepcopy(request))
             else:
                 request_sink.append(copy.deepcopy(request))
-        candidate = generator_fn(copy.deepcopy(request))
+        response = generator_fn(copy.deepcopy(request))
+        merged = _merge_repair(previous, response) if repairing else None
+        candidate = merged if merged is not None else response
         try:
             candidate = validate_candidate(base_plan, store, candidate)
         except ValueError as exc:
-            if attempt:
-                if degrade:
-                    return _freeze_degraded(base_plan, store, candidate, exc, provenance)
-                raise
-            body = json.loads(request['user'])
-            body['local_feedback'] = {'code': 'local_validation_failed', 'error': str(exc),
-                'check_errors': _candidate_diagnostics(base_plan, store, candidate),
-                'instruction': _fragment('prompts/bridge/fragments/instantiation.json', 'fragment_6')}
-            body['previous_candidate'] = candidate
-            request = {**request, 'user': canonical(body)}
-            continue
+            diagnostics = _candidate_diagnostics(base_plan, store, candidate)
+            progress = last_errors is None or len(diagnostics) < last_errors
+            if iteration == 1 or (repairs < _REPAIR_ROUNDS and progress):
+                target = _repair_request(base_plan, request, candidate, diagnostics)
+                if target is not None:
+                    if iteration > 1:
+                        repairs += 1
+                    last_errors = len(diagnostics)
+                    repairing, previous, request = True, candidate, target
+                    continue
+            if iteration == 1:
+                body = json.loads(request['user'])
+                body['local_feedback'] = {'code': 'local_validation_failed', 'error': str(exc),
+                    'check_errors': diagnostics,
+                    'instruction': _fragment('prompts/bridge/fragments/instantiation.json', 'fragment_6')}
+                body['previous_candidate'] = candidate
+                request = {**request, 'user': canonical(body)}
+                continue
+            if degrade:
+                return _freeze_degraded(base_plan, store, candidate, exc, provenance)
+            raise
         gaps = _tool_schema_gaps(base_plan, store, candidate)
         if not gaps:
             return freeze_plan(base_plan, store, candidate, provenance)
-        if attempt:
+        if iteration > 1:
             if degrade:
                 return _freeze_degraded(base_plan, store, candidate, ToolSchemaCoverageError(gaps), provenance)
             raise ToolSchemaCoverageError(gaps)
+        repairing, previous = False, None
         body = json.loads(request['user'])
+        body.pop('repair', None)
         body['local_feedback'] = {'code': 'available_tool_schema_omitted', 'gaps': gaps,
             'instruction': _fragment('prompts/bridge/fragments/instantiation.json', 'fragment_7')}
         body['previous_candidate'] = candidate
         request = {**request, 'user': canonical(body)}
-    raise AssertionError('Unreachable')
+
+
+def _repair_targets(base_plan, candidate, diagnostics):
+    """Rubrics whose entries must be regenerated, with what the model needs to see.
+
+    A rubric is a repair target when one of its checks failed local validation,
+    or when the entry carries neither checks nor an explicit unresolved reason.
+    """
+    entries = {}
+    if isinstance(candidate, dict) and isinstance(candidate.get('rubrics'), list):
+        for entry in candidate['rubrics']:
+            if isinstance(entry, dict) and isinstance(entry.get('rubric_id'), str):
+                entries[entry['rubric_id']] = entry
+    targets = []
+    for profile in base_plan['profiles']:
+        rubric_id = profile['id']
+        entry = entries.get(rubric_id) or {}
+        checks = entry.get('checks') if isinstance(entry.get('checks'), list) else []
+        unresolved = entry.get('unresolved') if isinstance(entry.get('unresolved'), list) else []
+        failures = [item for item in diagnostics if item.get('rubric_id') == rubric_id]
+        empty = not checks and not unresolved
+        if not failures and not empty:
+            continue
+        targets.append({'rubric_id': rubric_id,
+                        'checks': copy.deepcopy(checks),
+                        'unresolved': copy.deepcopy(unresolved),
+                        'failures': copy.deepcopy(failures),
+                        'empty': empty})
+    return targets
+
+
+def _repair_request(base_plan, request, candidate, diagnostics):
+    """Build a correction request that asks only for the failing rubrics.
+
+    Returns None when no rubric can be attributed, so the caller falls back to
+    the whole-candidate correction.
+    """
+    if not isinstance(candidate, dict):
+        return None
+    targets = _repair_targets(base_plan, candidate, diagnostics)
+    if not targets:
+        return None
+    body = json.loads(request['user'])
+    body.pop('previous_candidate', None)
+    body['local_feedback'] = {'code': 'local_validation_failed',
+        'error': 'Only the rubrics listed under repair.rubrics failed local validation.',
+        'check_errors': diagnostics,
+        'instruction': _fragment('prompts/bridge/fragments/instantiation.json', 'fragment_6')}
+    body['repair'] = {'mode': 'rubrics_only',
+        'instruction': _fragment('prompts/bridge/fragments/instantiation.json', 'fragment_8'),
+        'rubrics': targets}
+    system = _fragment('prompts/bridge/fragments/instantiation.json', 'fragment_9') + request['system']
+    return {**request, 'system': system, 'user': canonical(body)}
+
+
+def _merge_repair(previous, response):
+    """Splice repaired rubric entries back into the previous candidate.
+
+    Returns None when the response is not a repair payload, or when an entry
+    cannot be placed by rubric id.
+    """
+    if not isinstance(response, dict) or set(response) != {'repair'}:
+        return None
+    payload = response['repair']
+    if not isinstance(payload, dict) or set(payload) != {'rubrics'}:
+        return None
+    entries = payload['rubrics']
+    if not isinstance(entries, list) or not entries:
+        return None
+    merged = copy.deepcopy(previous)
+    by_id = {}
+    for entry in merged.get('rubrics') or []:
+        if isinstance(entry, dict) and isinstance(entry.get('rubric_id'), str):
+            by_id[entry['rubric_id']] = entry
+    for replacement in entries:
+        if not isinstance(replacement, dict):
+            return None
+        rubric_id = replacement.get('rubric_id')
+        if rubric_id not in by_id:
+            return None
+        checks = replacement.get('checks') or []
+        if not isinstance(checks, list) or not all(isinstance(item, dict) for item in checks):
+            return None
+        target = by_id[rubric_id]
+        kept = {item['id']: item for item in target.get('checks') or []
+                if isinstance(item, dict) and isinstance(item.get('id'), str)}
+        for item in checks:
+            kept.pop(item.get('id'), None)
+        target['checks'] = checks + list(kept.values())
+        if isinstance(replacement.get('unresolved'), list):
+            target['unresolved'] = replacement['unresolved']
+    return merged
 
 
 def _prune_candidate(base_plan, store, candidate, error):

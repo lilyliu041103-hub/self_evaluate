@@ -678,6 +678,78 @@ class InstantiationTests(unittest.TestCase):
         self.assertTrue(any("bad-quote" in note for note in notes))
         verify_instantiated(frozen, self.store)
 
+    def test_targeted_repair_asks_only_for_the_failing_rubric(self):
+        self.plan["methods"] = {"TU-2": "J"}
+        calls = []
+
+        def generator(request):
+            calls.append(request)
+            if len(calls) == 1:
+                proposed = candidate()
+                bad = task_check("bad-quote")
+                bad["source_refs"] = [{"evidence_id": "task:request", "quote": "an invented rule sentence"}]
+                entry(proposed)["checks"].append(bad)
+                return proposed
+            repair = json.loads(request["user"])["repair"]
+            target = repair["rubrics"][0]
+            checks = copy.deepcopy(target["checks"])
+            for check in checks:
+                if check["id"] == "bad-quote":
+                    check["source_refs"] = [{"evidence_id": "task:request", "quote": "submit a Chinese summary"}]
+            return {"repair": {"rubrics": [{"rubric_id": target["rubric_id"], "checks": checks,
+                                            "unresolved": target["unresolved"]}]}}
+
+        frozen = instantiate_plan(self.plan, self.store, generator)
+        ids = [check["id"] for check in frozen["task_checks"]]
+        self.assertEqual(ids, ["deliver-summary", "bad-quote"])
+        self.assertEqual(len(calls), 2)
+        body = json.loads(calls[1]["user"])
+        self.assertEqual(body["repair"]["mode"], "rubrics_only")
+        self.assertEqual([item["rubric_id"] for item in body["repair"]["rubrics"]], ["TC-1"])
+        self.assertEqual([item["id"] for item in body["repair"]["rubrics"][0]["checks"]],
+                         ["deliver-summary", "bad-quote"])
+        self.assertNotIn("previous_candidate", body)
+        self.assertIn("local_feedback", body)
+        self.assertEqual(body["local_feedback"]["check_errors"][0]["check_id"], "bad-quote")
+
+    def test_full_candidate_after_correction_still_freezes(self):
+        self.plan["methods"] = {"TU-2": "J"}
+        calls = []
+
+        def generator(request):
+            calls.append(request)
+            proposed = candidate()
+            if len(calls) == 1:
+                bad = task_check("bad-quote")
+                bad["source_refs"] = [{"evidence_id": "task:request", "quote": "an invented rule sentence"}]
+                entry(proposed)["checks"].append(bad)
+            return proposed
+
+        frozen = instantiate_plan(self.plan, self.store, generator)
+        self.assertEqual(len(calls), 2)
+        self.assertNotIn("bad-quote", [check["id"] for check in frozen["task_checks"]])
+        # The correction was asked for as a repair, but a full candidate is still accepted.
+        self.assertEqual(json.loads(calls[1]["user"])["repair"]["mode"], "rubrics_only")
+        self.assertIn("deliver-summary", [check["id"] for check in frozen["task_checks"]])
+
+    def test_repair_payload_with_unknown_rubric_is_rejected(self):
+        calls = []
+
+        def generator(request):
+            calls.append(request)
+            if len(calls) == 1:
+                proposed = candidate()
+                bad = task_check("bad-quote")
+                bad["source_refs"] = [{"evidence_id": "task:request", "quote": "an invented rule sentence"}]
+                entry(proposed)["checks"].append(bad)
+                return proposed
+            return {"repair": {"rubrics": [{"rubric_id": "absent-rubric",
+                                            "checks": [task_check("renamed-check")]}]}}
+
+        with self.assertRaises(ValueError):
+            instantiate_plan(self.plan, self.store, generator)
+        self.assertGreaterEqual(len(calls), 2)
+
 
 
 
